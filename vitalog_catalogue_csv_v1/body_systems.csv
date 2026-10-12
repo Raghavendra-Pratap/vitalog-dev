@@ -1,0 +1,16 @@
+code,name,map_region,covers
+blood,Blood,—,"Blood counts, iron, vitamins B12/folate, clotting"
+heart,Heart & circulation,heart,"Lipids, cardiac markers, BP, pulse"
+liver,Liver,liver,"Enzymes, bilirubin, proteins"
+kidney,Kidneys,kidneys,"Filtration, electrolytes, urine"
+pancreas,Pancreas & blood sugar,pancreas,"Glucose, HbA1c, insulin, amylase, lipase"
+thyroid,Thyroid,thyroid,"TSH, T3, T4, antibodies"
+parathyroid,Parathyroid,thyroid,PTH (shares thyroid region on map)
+bones,Bones & minerals,bones,"Vitamin D, calcium, phosphorus, magnesium"
+pituitary,Pituitary,brain,"Prolactin, FSH, LH, GH (shares head region)"
+adrenal,Adrenal,kidneys,"Cortisol, DHEA-S (near kidneys)"
+reproductive,Reproductive,pelvis,"Sex hormones, AMH, hCG, CA-125"
+prostate,Prostate,pelvis,PSA
+immune,Immune & infection,—,"CRP, autoimmune markers, infection tests"
+lungs,Lungs,lungs,"SpO₂, respiratory rate"
+general,General,—,"Weight, height, BMI, temperature, general markers"

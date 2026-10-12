@@ -1,0 +1,26 @@
+unit,printed_as
+10^6/µL,mill/cumm; million/cumm; 10^6/ul; 10^6/µl; x10^6/µL; 10^12/L; M/µL; mil/µL
+10^3/µL,thou/cumm; thousand/cumm; 10^3/ul; 10^3/µl; x10^3/µL; 10^9/L; K/µL; 10³/µL
+cells/µL,/cumm; cells/cumm; /cu mm; /mm3; cells/mm3; /µL; /ul
+lakhs/cumm,lakh/cumm; lakhs/cu mm; lakhs/µL; lac/cumm
+g/dL,g/dl; gm/dl; gm/dL; gm%; g%
+mg/dL,mg/dl; mg%; mgs/dl
+µg/dL,ug/dl; mcg/dl; µg/dl
+ng/mL,ng/ml; µg/L; ug/L
+pg/mL,pg/ml
+ng/dL,ng/dl
+µIU/mL,uIU/ml; µIU/ml; mIU/L; uIU/mL; microIU/mL
+mIU/mL,mIU/ml; IU/L
+IU/mL,IU/ml; U/mL; U/ml
+U/L,IU/L; U/l; IU/l
+mmol/L,mmol/l; mEq/L; mEq/l; meq/l
+µmol/L,umol/L; µmol/l; umol/l
+mg/L,mg/l
+fL,fl; femtolitre; cu micron; µm3
+pg,pg; picogram
+%,percent; %
+mm/hr,mm/1st hr; mm/hour; mm in 1st hr; mm/h
+mL/min/1.73m²,ml/min/1.73m2; mL/min/1.73 m2; ml/min/1.73sq.m
+/hpf,/HPF; per hpf; cells/hpf
+/lpf,/LPF; per lpf
+s,sec; seconds; secs

@@ -1,0 +1,33 @@
+Patient ID 18945041/RCL18588087
+Barcode NO RL17494011
+FIB 4 & LFT test Package
+Bilirubin Total 0.7 mg/dL 0 - 1.2
+Bilirubin Direct 0.2 mg/dL 0 - 0.20
+Bilirubin Indirect 0.5 mg/dL 0.1 - 1.0
+SGOT/AST
+69.3 H*
+U/L
+SGPT/ALT
+158.6 H*
+U/L
+SGOT/SGPT Ratio 0.44 Ratio
+Alkaline Phosphatase 90 U/L 40 - 129
+Total Protein 7.6 g/dL 6.4 - 8.3
+Albumin 5 g/dL 3.5 - 5.2
+Globulin*
+18945041
+/RCL18588087
+2.6
+g/dL
+2.3 - 3.5
+Gamma Glutamyl Transferase (GGT)
+65 H*
+U/L
+5 - 40
+Interpretation:
+Key enzymes tested:
+1. AST (SGOT): may indicate tissue injury / damage in muscles or liver.
+2. ALT (SGPT): Primarily in the liver. Elevated ALT and AST Suggest liver damage.
+3. Alkaline Phosphatase & GGT: Linked to bile production.
+Blood proteins, albumin and globulin, are essential for growth, development, and health.
+4. High albumin may indicate dehydration.

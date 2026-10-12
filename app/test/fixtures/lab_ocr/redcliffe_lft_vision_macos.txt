@@ -1,0 +1,106 @@
+LABORATORY REPORT
+Redcliffe
+labs
+Patient NAME
+DOB/Age/Gender : 30 Y/Male
+: Mr Raghav
+Patient ID /UHID
+Reterred BY
+:18945041/RCL18588087
+Report STATUS : Final Report
+:Dr. Prafulla Kumar Singh
+Barcode NO
+:RL17494011
+Sample Collected : Sep 21,2026.10:20AM
+Sample Type
+: Serum
+Test Description
+Report Date
+:Sep 21, 2026,08:34 PM.
+Value(s)
+Unit(s)
+Reference Range
+FIB 4 & LFT test Package
+Liver Function Test (LET)
+Bilirubin Total
+Diazo
+0.7
+mg/dL
+0-1.2
+Diazo
+Bilirubin Direct *
+0.2
+mg/dL.
+0 - 0.20
+Calculated
+Bilirubin Indirect •
+0.5
+mg/dL
+0.1 - 1.0
+SGOT/AST
+SGPT/ALT
+JFCC without P5P
+69.3 H*
+U/L
+up to 40
+IFCC without P5P
+158.6 H*
+U/L
+up to 41
+Caiculated
+SGOT/SGPT Ratio -
+0.44
+Ratio
+<1.00
+Alkaline Phosphatase
+IFCC
+90
+U/L
+40 - 129
+Biuret
+Total Protein
+7.6
+g/dL
+6.4 - 8.3
+Albumin
+g/dL
+3.5-5.2
+Globulin *
+BCG Colorimetric
+2.6
+g/dL
+2.3 -3.5
+Calculated
+Calculation (Albumiru/Globulin)
+Albumin :Globulin Ratio *
+1.92
+1.0-2.1
+Gamma Glutamyl Transferase (GGT) *
+65 H*
+U/L
+5-40
+ENZYMATIC
+The liver titers blood, mesabolizes nutrients, detoxilies harmtul substances, and produces blood cloting proteins. Liver cols contain enzymes that taclitato these
+Interpretation:
+functions. When cells are dameged, enzymes leak inso the tlood, detoctable through blood tests.
+Key enzymes sested:
+1. AST (SGOT): may indicate tissue injury/damage in muscles or liver.
+2. ALT (SGPT): Primarty in the lver. Elevated ALT ond AST suggestliver damage.
+3. Alkaline Phosphatase & GGT: Linked to tille production and fow Elevated levels may indicate ble flowrissues relased to the iiver, galbladder, or bile ducts.
+Blood proteins, albumin and globulin, areessential for growth, development, and heath.
+2. High protein (Hyperproteinemia): Otten due so defsydration or increased proten production.
+1. Low prosein: May Indicate bleeding, liver disorders, mainutrtion, or agammaglobuinemia.
+3. Low albumin: Caused by poor diet, kidhey, or iver cisease.
+4. High aibumin: Usually due to severe dehydration.
+Net-(re-igh.(*-Lae.2"-ClcH LoRCHe -ClbiN Hgt)
+(r) Permeteei ane oucitie thescopeut tests recognied under the NABL/ Dr. Shagufta Shahin
+MBBS. MD
+Dr. Shagufta Shahin
+REG. 72826
+Consultant Pathologist
+MBBS, MD (Path)
+PS 928:909-06 Redcliffe Lifetech Py. Lcd. Ppore WredSartelabe.Comr, Bareilly www.red-243001
+Booking Centre:- QMS-LUPIN NOIDA, QMS-LUPIN NOIDA
+All Lab results are subiject to clinical interpretation by qualited medical professional and this report is not sutject to use for any medioc-legal purpose.
+ccsupport@redcliffelabs.com
+www.redcliffelabs.com

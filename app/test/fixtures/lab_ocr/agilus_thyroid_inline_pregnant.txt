@@ -1,0 +1,15 @@
+T3 110.00 Non-Pregnant Women ng/dL
+80.0 - 200.0
+Pregnant Women
+1st Trimester: 105.0- 230.0
+2nd Trimester:129.0- 262.0
+3rd Trimester: 135.0- 262.0
+T4 9.57 Non-Pregnant Women Pg/dL
+5.10 - 14.10
+Pregnant Women
+1st Trimester: 7.33 - 14.80
+2nd Trimester: 7.93 - 16.10
+3rd Trimester: 6.95 - 15.70
+TSH (ULTRASENSITIVE) 2.720 Non
+Pregnant Women pIU/mL
+0.27 - 4.20

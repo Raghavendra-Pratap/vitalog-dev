@@ -1,0 +1,35 @@
+# Flutter / Dart
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+.idea/
+**/.DS_Store
+
+# Secrets / local health data — never commit
+*.env
+user.db
+*.sqlcipher
+/private/
+/corpus/
+
+# Regenerable
+catalog/catalog.db
+app/assets/catalog/catalog.db
+
+# Explicit Flutter build outputs
+app/build/
+**/Pods/
+**/.symlinks/
+
+# Signing — never commit
+**/*.jks
+**/*.keystore
+**/upload-keystore.jks
+**/key.properties

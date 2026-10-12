@@ -1,0 +1,21 @@
+code,name,panel_name_aliases,parameter_codes
+cbc,Complete blood count,"Complete Blood Count; CBC; Haemogram; Hemogram; Complete Haemogram; CBC Haemogram; Complete Haemogram, PS & ESR; CBC with ESR; Full Blood Count",hb; rbc; hct; mcv; mch; mchc; rdw_cv; rdw_sd; wbc; neut_pct; lymph_pct; mono_pct; eos_pct; baso_pct; ig_pct; anc; alc; amc; aec; abc; plt; mpv; pdw; plateletcrit; plcr; esr; retic; nlr
+lipid,Lipid profile,Lipid Profile; Lipid Panel; Lipid Profile - Basic; Lipid Profile - Extended; Cardiac Risk Profile; Lipid Studies,tc; tg; hdl; ldl; vldl; non_hdl; tc_hdl; ldl_hdl; hdl_ldl; tg_hdl; apoa1; apob; apob_apoa1; lpa
+lft,Liver function test,Liver Function Test; LFT; Liver Profile; Hepatic Function Panel; Liver Function Tests; Liver Panel,bil_t; bil_d; bil_i; ast; alt; alp; ggt; tp; alb; glob; ag_ratio; ast_alt; ldh
+kft,Kidney function test,Kidney Function Test; KFT; RFT; Renal Function Test; Renal Profile; Kidney Profile; Kidney Panel,urea; bun; creat; bun_creat; urea_creat; uric; egfr; cysc; u_creat; u_malb; uacr; upcr
+electrolytes,Electrolytes,Electrolytes; Serum Electrolytes; Electrolyte Panel; Na K Cl,na; k; cl; hco3
+minerals,Minerals & bone,Mineral Profile; Bone Profile; Calcium Phosphorus Profile,ca; ica; phos; mg; zinc
+diabetes,Diabetes,Diabetes Profile; Diabetic Profile; Blood Sugar; Glucose; Diabetes Screening; Glycemic Profile,glu_f; glu_pp; glu_r; glu_cap; ogtt_1h; ogtt_2h; hba1c; eag; ins_f; ins_pp; homa_ir; cpep; fruct
+pancreas,Pancreas,Pancreatic Profile; Amylase & Lipase,amylase; lipase
+thyroid,Thyroid profile,Thyroid Profile; Thyroid Function Test; TFT; Thyroid Profile Total; Thyroid Profile Free; T3 T4 TSH; Thyroid Panel,tsh; t3; t4; ft3; ft4; anti_tpo; anti_tg; thyroglobulin; rt3
+vitamins,Vitamins,Vitamin Profile; Vitamins,vitd; vitd_125; b12; folate
+iron,Iron studies,Iron Studies; Iron Profile; Anaemia Profile; Anemia Studies; Iron Deficiency Profile,iron; tibc; uibc; tsat; ferritin; transferrin
+cardiac,Cardiac & inflammation,Cardiac Markers; Cardiac Profile; Inflammation Markers; Cardiac Risk Markers,hscrp; crp; homocys; trop_i; trop_t; ckmb; cpk; ntprobnp; bnp
+coagulation,Coagulation,Coagulation Profile; PT/INR; Coagulation Studies,pt; inr; aptt; ddimer; fibrinogen
+hormones,Hormones,Hormone Profile; Fertility Profile; PCOD Profile; Male Hormone Profile; Female Hormone Profile,cortisol; prl; fsh; lh; gh; e2; prog; testo; ftesto; dheas; shbg; amh; bhcg; pth
+tumour_markers,Tumour markers,Tumour Markers; Tumor Markers; Cancer Markers,psa; fpsa; cea; ca125; ca199; ca153; afp
+immunology,Immunology,Arthritis Profile; Autoimmune Profile; Immunology,ra; anti_ccp; aso; ana; ige; blood_group
+infection,Infection & serology,Infection Profile; Serology; Fever Profile; Viral Markers; Hepatitis Profile,hbsag; anti_hcv; hiv; vdrl; widal; dengue_ns1; dengue_igm; dengue_igg; malaria; procalcitonin
+urine,Urine routine,Urine Routine; Urine Routine & Microscopy; Urine R/M; Urine R/E; Complete Urine Examination; CUE; Urine Complete Analysis; Urine Analysis; Urinalysis; Routine Urine Examination,u_colour; u_appearance; u_volume; u_ph; u_sg; u_protein; u_glucose; u_ketone; u_bilirubin; u_bile_salts; u_urobil; u_nitrite; u_le; u_blood; u_pus; u_rbc; u_epi; u_casts; u_crystals; u_bacteria; u_yeast
+stool,Stool routine,Stool Routine; Stool Examination; Stool R/M,stool_ob
+vitals,Vitals,Vitals; Vital Signs,bp_sys; bp_dia; pulse; spo2; resp_rate; temp; weight; height; bmi; waist

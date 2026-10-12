@@ -1,0 +1,36 @@
+DIAGNOSTIC REPORT
+agilus
+Test Report Status Results Biological Reference Interval Units
+SPECIALISED CHEMISTRY - LIPIDS
+COMPLETE CARE VITAL PRO
+LIPID PROFILE
+CHOLESTEROL, TOTAL
+182.00
+Adult
+125.0 - 200.0
+mg/dL
+TRIGLYCERIDES
+145.00
+Normal
+< 150.0
+mg/dL
+HDL CHOLESTEROL
+48.00
+Male
+35.0 - 80.0
+Female
+40.0 - 85.0
+mg/dL
+LDL CHOLESTEROL
+98.00
+Optimal
+< 100.0
+mg/dL
+Interpretation(s)
+Lipids are fats transported in blood.
+Page 3 Of 8
+PERFORMED AT :
+Agilus Diagnostics Ltd
+Email : lab.noreply@example.com
+Tel : 011-0000000
+CIN - U00000XX0000PLC000000

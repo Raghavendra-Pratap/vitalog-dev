@@ -1,0 +1,40 @@
+parameter_code,from_unit,to_unit,factor,offset,note
+*,10^3/µL,10^9/L,1,0,Identical scale
+*,10^6/µL,10^12/L,1,0,Identical scale
+*,cells/µL,10^3/µL,0.001,0,Absolute counts printed per µL / cumm
+plt,lakhs/cumm,10^3/µL,100,0,"1 lakh = 100,000"
+glu_*,mmol/L,mg/dL,18.016,0,Glucose
+tc,mmol/L,mg/dL,38.67,0,"Cholesterol (also HDL, LDL, VLDL, non-HDL)"
+tg,mmol/L,mg/dL,88.57,0,Triglycerides
+creat,µmol/L,mg/dL,0.01131,0,Creatinine (1 mg/dL = 88.42 µmol/L)
+urea,mmol/L,mg/dL,6.006,0,Urea
+bun,mmol/L,mg/dL,2.801,0,BUN
+uric,µmol/L,mg/dL,0.01681,0,Uric acid (1 mg/dL = 59.48 µmol/L)
+bil_*,µmol/L,mg/dL,0.05848,0,Bilirubin (1 mg/dL = 17.1 µmol/L)
+ca,mmol/L,mg/dL,4.008,0,Calcium
+phos,mmol/L,mg/dL,3.097,0,Phosphorus
+mg,mmol/L,mg/dL,2.431,0,Magnesium
+iron,µmol/L,µg/dL,5.585,0,"Iron (also TIBC, UIBC)"
+hb,g/L,g/dL,0.1,0,Haemoglobin
+alb,g/L,g/dL,0.1,0,"Albumin (also total protein, globulin)"
+vitd,nmol/L,ng/mL,0.4006,0,25-OH vitamin D (1 ng/mL = 2.496 nmol/L)
+b12,pmol/L,pg/mL,1.355,0,Vitamin B12
+folate,nmol/L,ng/mL,0.4413,0,Folate
+t4,nmol/L,µg/dL,0.0777,0,Total T4
+ft4,pmol/L,ng/dL,0.0777,0,Free T4
+t3,nmol/L,ng/dL,65.1,0,Total T3
+ft3,pmol/L,pg/mL,0.651,0,Free T3
+tsh,mIU/L,µIU/mL,1,0,TSH
+hscrp,mg/dL,mg/L,10,0,hs-CRP (also CRP)
+cortisol,nmol/L,µg/dL,0.03625,0,Cortisol
+testo,nmol/L,ng/dL,28.84,0,Testosterone
+e2,pmol/L,pg/mL,0.2724,0,Estradiol
+prl,mIU/L,ng/mL,0.0472,0,Prolactin (assay-dependent; verify)
+prog,nmol/L,ng/mL,0.3145,0,Progesterone
+amh,pmol/L,ng/mL,0.14,0,AMH
+trop_*,ng/L,ng/mL,0.001,0,Troponin
+uacr,mg/mmol,mg/g,8.84,0,Albumin/creatinine ratio
+hba1c,mmol/mol,%,0.0915,2.15,HbA1c IFCC → NGSP: % = mmol/mol × 0.0915 + 2.15
+temp,°F,°C,0.5556,-17.778,Temperature: (°F − 32) × 5/9
+weight,lb,kg,0.4536,0,Weight
+height,in,cm,2.54,0,Height

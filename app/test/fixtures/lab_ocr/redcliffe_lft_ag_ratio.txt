@@ -1,0 +1,31 @@
+Liver Function Test (LFT)
+SGOT/AST
+69.3
+U/L
+up to 40
+SGPT/ALT
+158.6
+U/L
+up to 41
+SGOT/SGPT Ratio *
+0.44
+Ratio
+<1.00
+Albumin
+5
+g/dL
+3.5 - 5.2
+Globulin *
+2.6
+g/dL
+2.3 - 3.5
+Calculated
+Calculation (Albumin/Globulin)
+Albumin :Globulin Ratio *
+1.92
+-
+1.0 - 2.1
+Gamma Glutamyl Transferase (GGT) *
+65
+U/L
+5 - 40

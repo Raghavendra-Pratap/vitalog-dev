@@ -1,0 +1,26 @@
+printed_term,candidates,resolution_rule
+glucose,glu_f; glu_pp; glu_r; ogtt_1h; ogtt_2h; u_glucose,"Section (urine → u_glucose); words fasting/F, PP/post, random/R, hr; else ask user"
+sugar,glu_f; glu_pp; glu_r; u_glucose,Same as glucose
+protein,tp; u_protein,Section/specimen: urine → u_protein
+albumin,alb; u_protein; u_malb,"Serum → alb; urine routine → u_protein; unit mg/L or ""micro"" → u_malb"
+bilirubin,bil_t; u_bilirubin,"Urine section → u_bilirubin; serum plain ""Bilirubin"" → bil_t"
+creatinine,creat; u_creat,"Urine section or ""urine""/""random urine"" → u_creat"
+calcium,ca; ica,"Unit mmol/L with ""ionized/ionised/free"" → ica; mg/dL → ca"
+tg,tg; thyroglobulin,Lipid section or mg/dL → tg; thyroid section or ng/mL → thyroglobulin
+pct,plateletcrit; procalcitonin,CBC section or % → plateletcrit; ng/mL → procalcitonin
+t3,t3; ft3,"""free"" or unit pg/mL → ft3; ng/dL → t3"
+t4,t4; ft4,"""free"" or unit ng/dL → ft4; µg/dL → t4"
+ldl,ldl (method),Same parameter; record calculated vs direct in method
+rbc,rbc; u_rbc,Urine section → u_rbc
+wbc,wbc; u_pus,Urine section → u_pus
+blood,u_blood,Only inside urine section
+haemoglobin / hemoglobin,hb; u_blood,Urine section → u_blood
+crp,crp; hscrp,"""hs""/""high sensitivity"" → hscrp; unit mg/dL → ×10"
+hdl/ldl vs ldl/hdl,hdl_ldl; ldl_hdl,Order of terms decides
+pdw,pdw,"Unit fL vs % — do not convert, keep as printed"
+lp(a),lpa,mg/dL vs nmol/L — not convertible; keep as printed
+aec,aec,cells/µL vs 10^3/µL — convert ×0.001
+vitamin d,vitd; vitd_125,"""1,25""/""dihydroxy""/""calcitriol"" → vitd_125; otherwise vitd"
+insulin,ins_f; ins_pp,"""PP/post"" → ins_pp; else ins_f"
+psa,psa; fpsa,"""free"" → fpsa"
+ph / sg / colour,u_ph; u_sg; u_colour,Only inside urine section

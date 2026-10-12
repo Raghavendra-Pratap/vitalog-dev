@@ -1,0 +1,16 @@
+ISO
+9001 :2015
+Patient NAME
+DOB/Age/Gender :30 Y/Male
+Patient ID / UHID :18945041/
+RCL18588087
+Referred BY : Dr. Prafulla Kumar Singh
+Sample Collected : Sep 21, 2026, 10:20
+AM
+Test Description
+Bilirubin Total
+Liver Function Test (LFT)
+Bilirubin Direct
+Bilirubin Indirect
+SGOTIAST
+SGPTIALT

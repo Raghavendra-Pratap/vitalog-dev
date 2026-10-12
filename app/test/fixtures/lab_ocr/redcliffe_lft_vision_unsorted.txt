@@ -1,0 +1,22 @@
+Gamma Glutamyl Transferase (GGT) ^
+Bilirubin Total
+0.7
+mg/dL
+0.0-1.2
+65
+U/L
+5-40
+SGPT/ALT
+SGOT/AST
+158.6
+U/L
+69.3
+U/L
+Globulin*
+18945041/RCL18588087
+2.6
+g/dL
+Interpretation:
+1. AST (SGOT): may indicate tissue injury / darmage in muscles or liver.
+2. ALT (SGPT): Primarily in the liver. Elevated ALT and AST SUggest liver damage.
+Blood proteins, albumin and globulin, are essential for growth, development, and health.

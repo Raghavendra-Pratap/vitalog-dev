@@ -1,0 +1,68 @@
+name: bodyline
+description: Local-first family lab tracker. Manual entry first.
+publish_to: "none"
+version: 0.2.3+72
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  bodyline_core:
+    path: ../core
+  sqflite_sqlcipher: ^3.1.0+1
+  path: ^1.9.0
+  path_provider: ^2.1.4
+  uuid: ^4.4.0
+  intl: ^0.19.0
+  flutter_svg: ^2.3.0
+  flutter_secure_storage: ^9.2.4
+  crypto: ^3.0.6
+  cryptography: ^2.7.0
+  file_picker: ^10.1.2
+  share_plus: ^10.1.4
+  open_filex: ^4.6.0
+  local_auth: ^2.3.0
+  pdf: ^3.11.1
+  printing: ^5.13.4
+  image_picker: ^1.1.2
+  image: ^4.3.0
+  google_mlkit_text_recognition: ^0.14.0
+  window_manager: ^0.5.2
+  syncfusion_flutter_pdf: ^34.2.9
+  shelf: ^1.4.2
+  shelf_router: ^1.1.4
+  http: ^1.6.0
+  network_info_plus: ^7.0.0
+  shared_preferences: ^2.5.5
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.10.0
+  flutter_timezone: ^4.1.0
+  qr_flutter: ^4.1.0
+  flutter_staggered_grid_view: ^0.7.0
+  app_links: ^7.2.1
+  mobile_scanner: ^7.4.2
+  health: ^12.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/catalog/catalog.db
+    - assets/catalog/drugs.json
+    - assets/body_map.svg
+    - assets/brand/bodyline-mark.svg
+    - assets/brand/vitalog-mark.svg
+
+  fonts:
+    - family: Fraunces
+      fonts:
+        - asset: assets/fonts/Fraunces-Variable.ttf
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope-Variable.ttf

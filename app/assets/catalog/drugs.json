@@ -1,0 +1,377 @@
+[
+  {
+    "name": "Paracetamol",
+    "kind": "allopathic",
+    "aliases": "acetaminophen,crocin,dolo"
+  },
+  {
+    "name": "Ibuprofen",
+    "kind": "allopathic",
+    "aliases": "brufen,combiflam"
+  },
+  {
+    "name": "Aspirin",
+    "kind": "allopathic",
+    "aliases": "ecosprin,acetylsalicylic"
+  },
+  {
+    "name": "Amoxicillin",
+    "kind": "allopathic",
+    "aliases": "mox,augmentin"
+  },
+  {
+    "name": "Azithromycin",
+    "kind": "allopathic",
+    "aliases": "azithral,zithrox"
+  },
+  {
+    "name": "Ciprofloxacin",
+    "kind": "allopathic",
+    "aliases": "ciplox,cifran"
+  },
+  {
+    "name": "Metronidazole",
+    "kind": "allopathic",
+    "aliases": "flagyl,metrogyl"
+  },
+  {
+    "name": "Cetirizine",
+    "kind": "allopathic",
+    "aliases": "cetzine,alerid"
+  },
+  {
+    "name": "Loratadine",
+    "kind": "allopathic",
+    "aliases": "lorfast"
+  },
+  {
+    "name": "Montelukast",
+    "kind": "allopathic",
+    "aliases": "montair,telekast"
+  },
+  {
+    "name": "Pantoprazole",
+    "kind": "allopathic",
+    "aliases": "pan,pantocid"
+  },
+  {
+    "name": "Omeprazole",
+    "kind": "allopathic",
+    "aliases": "omez,prilosec"
+  },
+  {
+    "name": "Ranitidine",
+    "kind": "allopathic",
+    "aliases": "rantac"
+  },
+  {
+    "name": "Domperidone",
+    "kind": "allopathic",
+    "aliases": "domstal"
+  },
+  {
+    "name": "Ondansetron",
+    "kind": "allopathic",
+    "aliases": "emset,zofran"
+  },
+  {
+    "name": "Metformin",
+    "kind": "allopathic",
+    "aliases": "glycomet,glucophage"
+  },
+  {
+    "name": "Glimepiride",
+    "kind": "allopathic",
+    "aliases": "amaryl,gp"
+  },
+  {
+    "name": "Sitagliptin",
+    "kind": "allopathic",
+    "aliases": "januvia,istavel"
+  },
+  {
+    "name": "Insulin Glargine",
+    "kind": "allopathic",
+    "aliases": "lantus,basalog"
+  },
+  {
+    "name": "Thyroxine",
+    "kind": "allopathic",
+    "aliases": "thyronorm,eltroxin,levothyroxine"
+  },
+  {
+    "name": "Atorvastatin",
+    "kind": "allopathic",
+    "aliases": "atorva,lipitor,storvas"
+  },
+  {
+    "name": "Rosuvastatin",
+    "kind": "allopathic",
+    "aliases": "rosuvas,crestor"
+  },
+  {
+    "name": "Amlodipine",
+    "kind": "allopathic",
+    "aliases": "amlip,norvasc"
+  },
+  {
+    "name": "Telmisartan",
+    "kind": "allopathic",
+    "aliases": "telma,tazloc"
+  },
+  {
+    "name": "Losartan",
+    "kind": "allopathic",
+    "aliases": "losar,covance"
+  },
+  {
+    "name": "Metoprolol",
+    "kind": "allopathic",
+    "aliases": "metolar,betaloc"
+  },
+  {
+    "name": "Propranolol",
+    "kind": "allopathic",
+    "aliases": "inderal,ciplar"
+  },
+  {
+    "name": "Clopidogrel",
+    "kind": "allopathic",
+    "aliases": "clopilet,plavix"
+  },
+  {
+    "name": "Warfarin",
+    "kind": "allopathic",
+    "aliases": "warfarin"
+  },
+  {
+    "name": "Enoxaparin",
+    "kind": "allopathic",
+    "aliases": "clexane"
+  },
+  {
+    "name": "Furosemide",
+    "kind": "allopathic",
+    "aliases": "lasix"
+  },
+  {
+    "name": "Spironolactone",
+    "kind": "allopathic",
+    "aliases": "aldactone"
+  },
+  {
+    "name": "Hydrochlorothiazide",
+    "kind": "allopathic",
+    "aliases": "aquazide"
+  },
+  {
+    "name": "Prednisolone",
+    "kind": "allopathic",
+    "aliases": "wysolone"
+  },
+  {
+    "name": "Dexamethasone",
+    "kind": "allopathic",
+    "aliases": "dexona"
+  },
+  {
+    "name": "Hydrocortisone",
+    "kind": "allopathic",
+    "aliases": "hycort"
+  },
+  {
+    "name": "Salbutamol",
+    "kind": "allopathic",
+    "aliases": "asthalin,ventolin"
+  },
+  {
+    "name": "Budesonide",
+    "kind": "allopathic",
+    "aliases": "budecort"
+  },
+  {
+    "name": "Formoterol",
+    "kind": "allopathic",
+    "aliases": "foracort"
+  },
+  {
+    "name": "Tiotropium",
+    "kind": "allopathic",
+    "aliases": "tiova"
+  },
+  {
+    "name": "Sertraline",
+    "kind": "allopathic",
+    "aliases": "serlift,zoloft"
+  },
+  {
+    "name": "Escitalopram",
+    "kind": "allopathic",
+    "aliases": "nexito,cipralex"
+  },
+  {
+    "name": "Fluoxetine",
+    "kind": "allopathic",
+    "aliases": "fludac,prozac"
+  },
+  {
+    "name": "Clonazepam",
+    "kind": "allopathic",
+    "aliases": "clonatri,klonopin"
+  },
+  {
+    "name": "Alprazolam",
+    "kind": "allopathic",
+    "aliases": "alprax,xanax"
+  },
+  {
+    "name": "Gabapentin",
+    "kind": "allopathic",
+    "aliases": "gabantin,neurontin"
+  },
+  {
+    "name": "Pregabalin",
+    "kind": "allopathic",
+    "aliases": "pregabalin,lyrica"
+  },
+  {
+    "name": "Tramadol",
+    "kind": "allopathic",
+    "aliases": "ultram,tramadol"
+  },
+  {
+    "name": "Diclofenac",
+    "kind": "allopathic",
+    "aliases": "voveran,diclofenac"
+  },
+  {
+    "name": "Aceclofenac",
+    "kind": "allopathic",
+    "aliases": "zerodol,hinac"
+  },
+  {
+    "name": "Calcium Carbonate",
+    "kind": "allopathic",
+    "aliases": "shelcal,calcirol"
+  },
+  {
+    "name": "Vitamin D3",
+    "kind": "allopathic",
+    "aliases": "cholecalciferol,uvitamin"
+  },
+  {
+    "name": "Vitamin B12",
+    "kind": "allopathic",
+    "aliases": "methylcobalamin,neurobion"
+  },
+  {
+    "name": "Folic Acid",
+    "kind": "allopathic",
+    "aliases": "folvite"
+  },
+  {
+    "name": "Iron Sucrose",
+    "kind": "allopathic",
+    "aliases": "orofer"
+  },
+  {
+    "name": "Ferrous Sulfate",
+    "kind": "allopathic",
+    "aliases": "ferrochelate"
+  },
+  {
+    "name": "ORS",
+    "kind": "allopathic",
+    "aliases": "electral,oral rehydration"
+  },
+  {
+    "name": "Lactulose",
+    "kind": "allopathic",
+    "aliases": "duphalac,livoluk"
+  },
+  {
+    "name": "Isabgol",
+    "kind": "ayurvedic",
+    "aliases": "psyllium,fybogel"
+  },
+  {
+    "name": "Triphala",
+    "kind": "ayurvedic",
+    "aliases": "triphala churna"
+  },
+  {
+    "name": "Ashwagandha",
+    "kind": "ayurvedic",
+    "aliases": "withania"
+  },
+  {
+    "name": "Turmeric / Curcumin",
+    "kind": "ayurvedic",
+    "aliases": "haldi,curcumin"
+  },
+  {
+    "name": "Giloy",
+    "kind": "ayurvedic",
+    "aliases": "tinospora,guduchi"
+  },
+  {
+    "name": "Amla",
+    "kind": "ayurvedic",
+    "aliases": "indian gooseberry"
+  },
+  {
+    "name": "Chyawanprash",
+    "kind": "ayurvedic",
+    "aliases": "chyavanprash"
+  },
+  {
+    "name": "Liv-52",
+    "kind": "ayurvedic",
+    "aliases": "himalaya liv"
+  },
+  {
+    "name": "Septilin",
+    "kind": "ayurvedic",
+    "aliases": "himalaya septilin"
+  },
+  {
+    "name": "Cystone",
+    "kind": "ayurvedic",
+    "aliases": "himalaya cystone"
+  },
+  {
+    "name": "Arnica",
+    "kind": "homeopathic",
+    "aliases": "arnica montana"
+  },
+  {
+    "name": "Belladonna",
+    "kind": "homeopathic",
+    "aliases": "belladonna"
+  },
+  {
+    "name": "Nux Vomica",
+    "kind": "homeopathic",
+    "aliases": "nux vom"
+  },
+  {
+    "name": "Oscillococcinum",
+    "kind": "homeopathic",
+    "aliases": "oscillo"
+  },
+  {
+    "name": "Calendula",
+    "kind": "homeopathic",
+    "aliases": "calendula"
+  },
+  {
+    "name": "Honey",
+    "kind": "other",
+    "aliases": "madhu"
+  },
+  {
+    "name": "Electrolyte powder",
+    "kind": "other",
+    "aliases": "ors powder"
+  }
+]

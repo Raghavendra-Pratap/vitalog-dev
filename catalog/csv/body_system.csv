@@ -1,0 +1,8 @@
+code,name,parent_code,map_region,sort_order
+blood,Blood,,blood,10
+metabolic,Metabolic,,metabolic,60
+kidney,Kidney,,kidney,40
+liver,Liver,,liver,30
+thyroid,Thyroid,endocrine,thyroid,51
+endocrine,Endocrine,,endocrine,50
+heart,Heart,,heart,20

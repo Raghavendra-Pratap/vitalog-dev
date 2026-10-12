@@ -1,0 +1,194 @@
+code,name,panel,body_system,specimen,kind,value_type,canonical_unit,decimals,alias_count,notes
+hb,Haemoglobin,cbc,blood,whole blood (EDTA),lab,numeric,g/dL,1,8,
+rbc,RBC count,cbc,blood,whole blood (EDTA),lab,numeric,10^6/µL,2,7,Also printed as mill/cumm (= 10^6/µL).
+hct,Haematocrit (PCV),cbc,blood,whole blood (EDTA),lab,numeric,%,1,7,
+mcv,MCV,cbc,blood,whole blood (EDTA),lab,numeric,fL,1,3,
+mch,MCH,cbc,blood,whole blood (EDTA),lab,numeric,pg,1,4,
+mchc,MCHC,cbc,blood,whole blood (EDTA),lab,numeric,g/dL,1,4,
+rdw_cv,RDW-CV,cbc,blood,whole blood (EDTA),lab,numeric,%,1,6,"Plain ""RDW"" usually means RDW-CV (%)."
+rdw_sd,RDW-SD,cbc,blood,whole blood (EDTA),lab,numeric,fL,1,4,
+wbc,Total leucocyte count (WBC),cbc,blood,whole blood (EDTA),lab,numeric,10^3/µL,2,10,Also printed as cells/cumm (×0.001) or thou/cumm.
+neut_pct,Neutrophils (%),cbc,blood,whole blood (EDTA),lab,numeric,%,0,7,
+lymph_pct,Lymphocytes (%),cbc,blood,whole blood (EDTA),lab,numeric,%,0,3,
+mono_pct,Monocytes (%),cbc,blood,whole blood (EDTA),lab,numeric,%,0,3,
+eos_pct,Eosinophils (%),cbc,blood,whole blood (EDTA),lab,numeric,%,0,4,
+baso_pct,Basophils (%),cbc,blood,whole blood (EDTA),lab,numeric,%,0,3,
+ig_pct,Immature granulocytes (%),cbc,blood,whole blood (EDTA),lab,numeric,%,1,4,
+anc,Absolute neutrophil count,cbc,blood,whole blood (EDTA),lab,numeric,10^3/µL,2,5,
+alc,Absolute lymphocyte count,cbc,blood,whole blood (EDTA),lab,numeric,10^3/µL,2,4,
+amc,Absolute monocyte count,cbc,blood,whole blood (EDTA),lab,numeric,10^3/µL,2,3,
+aec,Absolute eosinophil count,cbc,blood,whole blood (EDTA),lab,numeric,10^3/µL,2,4,Often printed in cells/µL or /cumm (×0.001).
+abc,Absolute basophil count,cbc,blood,whole blood (EDTA),lab,numeric,10^3/µL,2,3,
+plt,Platelet count,cbc,blood,whole blood (EDTA),lab,numeric,10^3/µL,0,6,Indian labs often print lakhs/cumm (×100).
+mpv,MPV,cbc,blood,whole blood (EDTA),lab,numeric,fL,1,2,
+pdw,PDW,cbc,blood,whole blood (EDTA),lab,numeric,fL,1,2,Some analysers report PDW in % — not convertible; keep as printed.
+plateletcrit,Plateletcrit (PCT),cbc,blood,whole blood (EDTA),lab,numeric,%,2,2,"""PCT"" collides with procalcitonin (ng/mL) — resolve by section/unit."
+plcr,Platelet large cell ratio,cbc,blood,whole blood (EDTA),lab,numeric,%,1,3,
+esr,ESR,cbc,blood,whole blood (EDTA),lab,numeric,mm/hr,0,6,
+retic,Reticulocyte count,cbc,blood,whole blood (EDTA),lab,numeric,%,1,4,
+nlr,Neutrophil–lymphocyte ratio,cbc,blood,whole blood (EDTA),lab,numeric,ratio,2,3,Derived; some labs print it.
+tc,Total cholesterol,lipid,heart,serum,lab,numeric,mg/dL,0,8,
+tg,Triglycerides,lipid,heart,serum,lab,numeric,mg/dL,0,6,"""TG"" collides with thyroglobulin (ng/mL) — resolve by section/unit."
+hdl,HDL cholesterol,lipid,heart,serum,lab,numeric,mg/dL,0,7,
+ldl,LDL cholesterol,lipid,heart,serum,lab,numeric,mg/dL,0,10,Store method (calculated vs direct) in observation.method.
+vldl,VLDL cholesterol,lipid,heart,serum,lab,numeric,mg/dL,0,5,
+non_hdl,Non-HDL cholesterol,lipid,heart,serum,lab,numeric,mg/dL,0,4,
+tc_hdl,Total cholesterol / HDL ratio,lipid,heart,serum,lab,numeric,ratio,1,7,
+ldl_hdl,LDL / HDL ratio,lipid,heart,serum,lab,numeric,ratio,1,3,
+hdl_ldl,HDL / LDL ratio,lipid,heart,serum,lab,numeric,ratio,2,2,Order matters: HDL/LDL ≠ LDL/HDL.
+tg_hdl,Triglycerides / HDL ratio,lipid,heart,serum,lab,numeric,ratio,1,4,
+apoa1,Apolipoprotein A1,lipid,heart,serum,lab,numeric,mg/dL,0,5,
+apob,Apolipoprotein B,lipid,heart,serum,lab,numeric,mg/dL,0,4,
+apob_apoa1,Apo B / Apo A1 ratio,lipid,heart,serum,lab,numeric,ratio,2,3,
+lpa,Lipoprotein (a),lipid,heart,serum,lab,numeric,mg/dL,1,5,"mg/dL and nmol/L are NOT interconvertible — keep as printed, do not merge units."
+bil_t,"Bilirubin, total",lft,liver,serum,lab,numeric,mg/dL,2,7,
+bil_d,"Bilirubin, direct",lft,liver,serum,lab,numeric,mg/dL,2,6,
+bil_i,"Bilirubin, indirect",lft,liver,serum,lab,numeric,mg/dL,2,5,
+ast,AST (SGOT),lft,liver,serum,lab,numeric,U/L,0,9,
+alt,ALT (SGPT),lft,liver,serum,lab,numeric,U/L,0,9,
+alp,Alkaline phosphatase,lft,liver,serum,lab,numeric,U/L,0,6,
+ggt,Gamma GT,lft,liver,serum,lab,numeric,U/L,0,7,
+tp,Total protein,lft,liver,serum,lab,numeric,g/dL,1,6,
+alb,Albumin (serum),lft,liver,serum,lab,numeric,g/dL,1,4,"""Albumin"" also appears in urine routine — resolve by section/specimen."
+glob,Globulin,lft,liver,serum,lab,numeric,g/dL,1,3,
+ag_ratio,Albumin / globulin ratio,lft,liver,serum,lab,numeric,ratio,2,5,
+ast_alt,AST / ALT ratio,lft,liver,serum,lab,numeric,ratio,2,4,
+ldh,LDH,lft,liver,serum,lab,numeric,U/L,0,5,
+urea,Urea,kft,kidney,serum,lab,numeric,mg/dL,0,6,
+bun,Blood urea nitrogen (BUN),kft,kidney,serum,lab,numeric,mg/dL,1,6,BUN = urea × 0.467 (mg/dL).
+creat,Creatinine (serum),kft,kidney,serum,lab,numeric,mg/dL,2,7,
+bun_creat,BUN / creatinine ratio,kft,kidney,serum,lab,numeric,ratio,1,4,
+urea_creat,Urea / creatinine ratio,kft,kidney,serum,lab,numeric,ratio,1,3,
+uric,Uric acid,kft,kidney,serum,lab,numeric,mg/dL,1,6,
+egfr,eGFR,kft,kidney,calculated,lab,numeric,mL/min/1.73m²,0,7,"Store formula (CKD-EPI 2009/2021, MDRD) in observation.method."
+cysc,Cystatin C,kft,kidney,serum,lab,numeric,mg/L,2,3,
+u_creat,Creatinine (urine),kft,kidney,urine,lab,numeric,mg/dL,1,5,
+u_malb,Microalbumin (urine),kft,kidney,urine,lab,numeric,mg/L,1,5,
+uacr,Urine albumin / creatinine ratio,kft,kidney,urine,lab,numeric,mg/g,1,7,mg/g ↔ mg/mmol: ×0.113.
+upcr,Urine protein / creatinine ratio,kft,kidney,urine,lab,numeric,mg/mg,2,4,
+na,Sodium,electrolytes,kidney,serum,lab,numeric,mmol/L,0,6,mEq/L = mmol/L.
+k,Potassium,electrolytes,kidney,serum,lab,numeric,mmol/L,1,6,
+cl,Chloride,electrolytes,kidney,serum,lab,numeric,mmol/L,0,6,
+hco3,Bicarbonate,electrolytes,kidney,serum,lab,numeric,mmol/L,0,6,
+ca,Calcium (total),minerals,bones,serum,lab,numeric,mg/dL,1,7,
+ica,Calcium (ionised),minerals,bones,serum,lab,numeric,mmol/L,2,5,
+phos,Phosphorus,minerals,bones,serum,lab,numeric,mg/dL,1,6,
+mg,Magnesium,minerals,bones,serum,lab,numeric,mg/dL,1,4,
+zinc,Zinc,minerals,blood,serum,lab,numeric,µg/dL,0,3,
+glu_f,"Glucose, fasting",diabetes,pancreas,plasma (fluoride),lab,numeric,mg/dL,0,13,
+glu_pp,"Glucose, post-meal",diabetes,pancreas,plasma (fluoride),lab,numeric,mg/dL,0,12,
+glu_r,"Glucose, random",diabetes,pancreas,plasma (fluoride),lab,numeric,mg/dL,0,8,
+glu_cap,"Glucose, capillary (glucometer)",diabetes,pancreas,capillary blood,vital,numeric,mg/dL,0,5,Home reading; stored as a vital.
+ogtt_1h,"Glucose, 1 hour (OGTT)",diabetes,pancreas,plasma (fluoride),lab,numeric,mg/dL,0,5,
+ogtt_2h,"Glucose, 2 hours (OGTT)",diabetes,pancreas,plasma (fluoride),lab,numeric,mg/dL,0,5,Differs from post-meal glucose: taken after a 75 g glucose drink.
+hba1c,HbA1c,diabetes,pancreas,whole blood (EDTA),lab,numeric,%,1,12,% ↔ mmol/mol (IFCC): mmol/mol = (% − 2.15) × 10.929.
+eag,Estimated average glucose,diabetes,pancreas,calculated,lab,numeric,mg/dL,0,6,Derived from HbA1c.
+ins_f,"Insulin, fasting",diabetes,pancreas,serum,lab,numeric,µIU/mL,1,6,
+ins_pp,"Insulin, post-meal",diabetes,pancreas,serum,lab,numeric,µIU/mL,1,3,
+homa_ir,HOMA-IR,diabetes,pancreas,calculated,lab,numeric,ratio,2,4,
+cpep,C-peptide,diabetes,pancreas,serum,lab,numeric,ng/mL,2,4,
+fruct,Fructosamine,diabetes,pancreas,serum,lab,numeric,µmol/L,0,2,
+amylase,Amylase,pancreas,pancreas,serum,lab,numeric,U/L,0,4,
+lipase,Lipase,pancreas,pancreas,serum,lab,numeric,U/L,0,3,
+tsh,TSH,thyroid,thyroid,serum,lab,numeric,µIU/mL,2,11,µIU/mL = mIU/L.
+t3,T3 (total),thyroid,thyroid,serum,lab,numeric,ng/dL,0,8,"Plain ""T3"" = total unless ""free"" appears or unit is pg/mL."
+t4,T4 (total),thyroid,thyroid,serum,lab,numeric,µg/dL,1,8,
+ft3,Free T3,thyroid,thyroid,serum,lab,numeric,pg/mL,2,5,
+ft4,Free T4,thyroid,thyroid,serum,lab,numeric,ng/dL,2,6,
+anti_tpo,Anti-TPO antibodies,thyroid,thyroid,serum,lab,numeric,IU/mL,1,8,
+anti_tg,Anti-thyroglobulin antibodies,thyroid,thyroid,serum,lab,numeric,IU/mL,1,6,
+thyroglobulin,Thyroglobulin,thyroid,thyroid,serum,lab,numeric,ng/mL,2,3,"""Tg"" collides with triglycerides (mg/dL) — resolve by section/unit."
+rt3,Reverse T3,thyroid,thyroid,serum,lab,numeric,ng/dL,1,3,
+vitd,Vitamin D (25-OH),vitamins,bones,serum,lab,numeric,ng/mL,1,12,"""Vitamin D3"" on Indian reports almost always means 25-OH total."
+vitd_125,"Vitamin D (1,25-dihydroxy)",vitamins,bones,serum,lab,numeric,pg/mL,1,5,Different test from 25-OH — never merge.
+b12,Vitamin B12,vitamins,blood,serum,lab,numeric,pg/mL,0,7,
+folate,Folate,vitamins,blood,serum,lab,numeric,ng/mL,1,5,
+iron,Iron,iron,blood,serum,lab,numeric,µg/dL,0,6,
+tibc,Total iron binding capacity,iron,blood,serum,lab,numeric,µg/dL,0,3,
+uibc,Unsaturated iron binding capacity,iron,blood,serum,lab,numeric,µg/dL,0,2,
+tsat,Transferrin saturation,iron,blood,serum,lab,numeric,%,0,7,
+ferritin,Ferritin,iron,blood,serum,lab,numeric,ng/mL,1,5,ng/mL = µg/L.
+transferrin,Transferrin,iron,blood,serum,lab,numeric,mg/dL,0,2,
+hscrp,hs-CRP,cardiac,heart,serum,lab,numeric,mg/L,2,8,mg/dL × 10 = mg/L.
+crp,CRP,cardiac,immune,serum,lab,numeric,mg/L,1,6,Check unit: mg/L vs mg/dL (×10).
+homocys,Homocysteine,cardiac,heart,serum,lab,numeric,µmol/L,1,4,
+trop_i,Troponin I,cardiac,heart,serum,lab,numeric,ng/mL,3,6,hs assays often report ng/L (×0.001 → ng/mL).
+trop_t,Troponin T,cardiac,heart,serum,lab,numeric,ng/mL,3,5,
+ckmb,CK-MB,cardiac,heart,serum,lab,numeric,U/L,0,4,Some labs report mass in ng/mL — not convertible to U/L.
+cpk,Creatine kinase (CPK),cardiac,heart,serum,lab,numeric,U/L,0,6,
+ntprobnp,NT-proBNP,cardiac,heart,serum,lab,numeric,pg/mL,0,5,
+bnp,BNP,cardiac,heart,serum,lab,numeric,pg/mL,0,3,
+pt,Prothrombin time,coagulation,blood,plasma (citrate),lab,numeric,s,1,5,
+inr,INR,coagulation,blood,plasma (citrate),lab,numeric,ratio,2,5,
+aptt,aPTT,coagulation,blood,plasma (citrate),lab,numeric,s,1,5,
+ddimer,D-dimer,coagulation,blood,plasma (citrate),lab,numeric,ng/mL FEU,0,3,"Units vary (ng/mL FEU, µg/mL FEU, DDU) — convert only within FEU."
+fibrinogen,Fibrinogen,coagulation,blood,plasma (citrate),lab,numeric,mg/dL,0,2,
+cortisol,Cortisol,hormones,adrenal,serum,lab,numeric,µg/dL,1,6,Record collection time.
+prl,Prolactin,hormones,pituitary,serum,lab,numeric,ng/mL,1,3,
+fsh,FSH,hormones,pituitary,serum,lab,numeric,mIU/mL,1,3,
+lh,LH,hormones,pituitary,serum,lab,numeric,mIU/mL,1,3,
+gh,Growth hormone,hormones,pituitary,serum,lab,numeric,ng/mL,2,4,
+e2,Estradiol,hormones,reproductive,serum,lab,numeric,pg/mL,1,5,
+prog,Progesterone,hormones,reproductive,serum,lab,numeric,ng/mL,2,3,
+testo,Testosterone (total),hormones,reproductive,serum,lab,numeric,ng/dL,0,5,
+ftesto,Testosterone (free),hormones,reproductive,serum,lab,numeric,pg/mL,2,3,
+dheas,DHEA-S,hormones,adrenal,serum,lab,numeric,µg/dL,1,5,
+shbg,SHBG,hormones,reproductive,serum,lab,numeric,nmol/L,1,2,
+amh,AMH,hormones,reproductive,serum,lab,numeric,ng/mL,2,4,ng/mL × 7.14 = pmol/L.
+bhcg,Beta hCG,hormones,reproductive,serum,lab,numeric,mIU/mL,1,6,mIU/mL = IU/L.
+pth,Parathyroid hormone (intact),hormones,parathyroid,serum,lab,numeric,pg/mL,1,6,
+psa,PSA (total),tumour_markers,prostate,serum,lab,numeric,ng/mL,2,6,
+fpsa,PSA (free),tumour_markers,prostate,serum,lab,numeric,ng/mL,2,4,
+cea,CEA,tumour_markers,general,serum,lab,numeric,ng/mL,2,3,
+ca125,CA-125,tumour_markers,reproductive,serum,lab,numeric,U/mL,1,4,
+ca199,CA 19-9,tumour_markers,pancreas,serum,lab,numeric,U/mL,1,5,
+ca153,CA 15-3,tumour_markers,general,serum,lab,numeric,U/mL,1,4,
+afp,AFP,tumour_markers,liver,serum,lab,numeric,ng/mL,2,4,
+ra,Rheumatoid factor,immunology,immune,serum,lab,numeric,IU/mL,1,5,
+anti_ccp,Anti-CCP,immunology,immune,serum,lab,numeric,U/mL,1,5,
+aso,ASO,immunology,immune,serum,lab,numeric,IU/mL,0,5,
+ana,ANA,immunology,immune,serum,lab,text,,0,6,Qualitative/titre; store as printed.
+ige,IgE (total),immunology,immune,serum,lab,numeric,IU/mL,0,5,
+blood_group,Blood group,immunology,blood,whole blood,lab,text,,0,7,Profile-level fact; also write to profile.blood_group on confirm.
+hbsag,HBsAg,infection,immune,serum,lab,text,,0,5,"Qualitative (Reactive / Non-reactive, Positive / Negative)."
+anti_hcv,Anti-HCV,infection,immune,serum,lab,text,,0,5,"Qualitative (Reactive / Non-reactive, Positive / Negative)."
+hiv,HIV 1 & 2 antibodies,infection,immune,serum,lab,text,,0,6,"Qualitative (Reactive / Non-reactive, Positive / Negative)."
+vdrl,VDRL / RPR,infection,immune,serum,lab,text,,0,4,"Qualitative (Reactive / Non-reactive, Positive / Negative)."
+widal,Widal,infection,immune,serum,lab,text,,0,4,"Qualitative (Reactive / Non-reactive, Positive / Negative)."
+dengue_ns1,Dengue NS1 antigen,infection,immune,serum,lab,text,,0,4,"Qualitative (Reactive / Non-reactive, Positive / Negative)."
+dengue_igm,Dengue IgM,infection,immune,serum,lab,text,,0,2,"Qualitative (Reactive / Non-reactive, Positive / Negative)."
+dengue_igg,Dengue IgG,infection,immune,serum,lab,text,,0,2,"Qualitative (Reactive / Non-reactive, Positive / Negative)."
+malaria,Malaria antigen / parasite,infection,immune,serum,lab,text,,0,6,"Qualitative (Reactive / Non-reactive, Positive / Negative)."
+procalcitonin,Procalcitonin,infection,immune,serum,lab,numeric,ng/mL,2,2,"""PCT"" collides with plateletcrit (%)."
+u_colour,Colour,urine,kidney,urine,lab,text,,0,4,Urine routine — only match inside a urine section.
+u_appearance,Appearance,urine,kidney,urine,lab,text,,0,4,Urine routine — only match inside a urine section.
+u_volume,Volume,urine,kidney,urine,lab,numeric,mL,1,3,Urine routine — only match inside a urine section.
+u_ph,pH,urine,kidney,urine,lab,numeric,,1,4,Urine routine — only match inside a urine section.
+u_sg,Specific gravity,urine,kidney,urine,lab,numeric,,3,4,Urine routine — only match inside a urine section.
+u_protein,Protein (urine),urine,kidney,urine,lab,text,,0,6,Urine routine — only match inside a urine section.
+u_glucose,Glucose (urine),urine,kidney,urine,lab,text,,0,5,Urine routine — only match inside a urine section.
+u_ketone,Ketone bodies,urine,kidney,urine,lab,text,,0,4,Urine routine — only match inside a urine section.
+u_bilirubin,Bilirubin (urine),urine,kidney,urine,lab,text,,0,3,Urine routine — only match inside a urine section.
+u_bile_salts,Bile salts,urine,kidney,urine,lab,text,,0,2,Urine routine — only match inside a urine section.
+u_urobil,Urobilinogen,urine,kidney,urine,lab,text,,0,2,Urine routine — only match inside a urine section.
+u_nitrite,Nitrite,urine,kidney,urine,lab,text,,0,2,Urine routine — only match inside a urine section.
+u_le,Leucocyte esterase,urine,kidney,urine,lab,text,,0,3,Urine routine — only match inside a urine section.
+u_blood,Blood (urine),urine,kidney,urine,lab,text,,0,5,Urine routine — only match inside a urine section.
+u_pus,Pus cells,urine,kidney,urine,lab,text,/hpf,0,7,Urine routine — only match inside a urine section.
+u_rbc,RBCs (urine),urine,kidney,urine,lab,text,/hpf,0,5,Urine routine — only match inside a urine section.
+u_epi,Epithelial cells,urine,kidney,urine,lab,text,/hpf,0,3,Urine routine — only match inside a urine section.
+u_casts,Casts,urine,kidney,urine,lab,text,/lpf,0,4,Urine routine — only match inside a urine section.
+u_crystals,Crystals,urine,kidney,urine,lab,text,,0,5,Urine routine — only match inside a urine section.
+u_bacteria,Bacteria,urine,kidney,urine,lab,text,,0,2,Urine routine — only match inside a urine section.
+u_yeast,Yeast cells,urine,kidney,urine,lab,text,,0,3,Urine routine — only match inside a urine section.
+stool_ob,Occult blood (stool),stool,general,stool,lab,text,,0,5,Only match inside a stool section.
+bp_sys,"Blood pressure, systolic",vitals,heart,—,vital,numeric,mmHg,0,4,
+bp_dia,"Blood pressure, diastolic",vitals,heart,—,vital,numeric,mmHg,0,4,
+pulse,Pulse,vitals,heart,—,vital,numeric,bpm,0,4,
+spo2,Oxygen saturation (SpO₂),vitals,lungs,—,vital,numeric,%,0,4,
+resp_rate,Respiratory rate,vitals,lungs,—,vital,numeric,/min,0,3,
+temp,Body temperature,vitals,general,—,vital,numeric,°C,1,3,
+weight,Weight,vitals,general,—,vital,numeric,kg,1,3,
+height,Height,vitals,general,—,vital,numeric,cm,1,2,
+bmi,BMI,vitals,general,—,vital,numeric,kg/m²,1,2,
+waist,Waist circumference,vitals,general,—,vital,numeric,cm,1,2,

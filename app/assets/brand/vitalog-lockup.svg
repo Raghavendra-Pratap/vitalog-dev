@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 100" width="880" height="200">
+<g><path d="M50 80 C24 64 14 48 20 34 C25 22 42 20 50 32 C58 20 75 22 80 34 C86 48 76 64 50 80 Z" fill="none" stroke="#0E6B63" stroke-width="5" stroke-linejoin="round"/><polyline points="22,52 38,52 44,40 52,64 58,46 62,52 78,52" fill="none" stroke="#B8561B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="108" y="68" font-family="Fraunces, Georgia, serif" font-weight="600" font-size="52" fill="#1C2230">Vitalog</text>
+</svg>

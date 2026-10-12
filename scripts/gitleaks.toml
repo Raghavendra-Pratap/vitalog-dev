@@ -1,0 +1,15 @@
+title = "bodyline"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Build artifacts, CocoaPods vendored sources, local signing"
+paths = [
+  '''(?i)(.*?)(/|\\)\.dart_tool(/|\\).*''',
+  '''(?i)(.*?)(/|\\)build(/|\\).*''',
+  '''(?i)(.*?)(/|\\)\.gradle(/|\\).*''',
+  '''(?i)(.*?)(/|\\)Pods(/|\\).*''',
+  '''(?i)(.*?)upload-keystore\.jks$''',
+  '''(?i)(.*?)key\.properties$''',
+]

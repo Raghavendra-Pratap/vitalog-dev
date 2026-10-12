@@ -1,0 +1,9 @@
+step,rule
+1,"Lowercase; replace & with ""and""; µ→u; β→beta; strip punctuation to spaces; collapse spaces."
+2,"Remove specimen words before matching: serum, sr, s, plasma, whole blood, edta, fluoride, fluoride plasma, heparin, citrate — but keep ""urine"" and ""stool"" (they change the parameter)."
+3,"Remove method words: calculated, calc, direct (except LDL/bilirubin — keep, it is part of the name), enzymatic, kinetic, colorimetric, clia, eclia, cmia, elfa, hplc, ise, indirect ise, immunoturbidimetric, turbidimetric, electrical impedance, flow cytometry, microscopy, photometry, spectrophotometry. Store the removed method in observation.method."
+4,"Remove bracketed abbreviations only if the remaining text matches; otherwise try the bracket content alone, e.g. ""Alanine Aminotransferase (ALT)"" → try full, then ""ALT""."
+5,Exact match on normalised alias first; then match with specimen/method words removed; then fuzzy (edit distance ≤ 2 on names ≥ 6 chars) → always send fuzzy matches to review.
+6,"Use the section heading (panel alias) to disambiguate: CBC, Lipid, Urine routine, etc. Urine-section rows only match urine parameters."
+7,Use the printed unit to disambiguate (see Ambiguities) and to pick conversions; unknown unit → review.
+8,"Never auto-merge different tests that share a word: 25-OH vs 1,25 vitamin D, total vs free T3/T4, PSA total vs free, glucose fasting vs PP vs random vs OGTT."

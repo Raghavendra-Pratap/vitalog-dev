@@ -1,0 +1,29 @@
+Liver Function Test (LFT)
+SGPT/ALT 158.6 U/L up to 41
+SGOT/AST 69.3 U/L up to 40
+Albumin 5 g/dL 3.5 -5.2
+Alkaline Phosphatase 90 U/L 40 - 129
+Bilirubin Total 0.7 mg/dL 0-1.2
+Total Protein 7.6 g/dL 6.4- 8.3
+Bilirubin Direct
+0.2
+mgIdL
+0-0.20
+Bilirubin Indirect
+0.5
+mg/dL
+0.1-1.0
+Globulin *
+2.6
+gIdL
+2.3-3.5
+Albumin :Globulin Ratio
+1.92
+-
+1.0-2.1
+SGOT/SGPT Ratio *
+0.44
+Ratio
+<1.00
+Gamma Glutamyl Transferase (GGT)
+65 UIL 5-40

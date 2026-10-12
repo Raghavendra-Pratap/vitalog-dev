@@ -1,0 +1,21 @@
+code,name
+cbc,Complete blood count
+lipid,Lipid profile
+lft,Liver function test
+kft,Kidney function test
+electrolytes,Electrolytes
+minerals,Minerals & bone
+diabetes,Diabetes
+pancreas,Pancreas
+thyroid,Thyroid profile
+vitamins,Vitamins
+iron,Iron studies
+cardiac,Cardiac & inflammation
+coagulation,Coagulation
+hormones,Hormones
+tumour_markers,Tumour markers
+immunology,Immunology
+infection,Infection & serology
+urine,Urine routine
+stool,Stool routine
+vitals,Vitals

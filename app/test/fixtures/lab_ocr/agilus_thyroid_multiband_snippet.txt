@@ -1,0 +1,11 @@
+THYROID PANEL(T3,T4 & TSH)
+T3
+110.00
+Non-Pregnant Women
+80.0 - 200.0
+Pregnant Women
+1st Trimester:105.0 - 230.0
+2nd Trimester:129.0 - 262.0
+3rd Trimester:135.0 - 262.0
+ng/dL
+Interpretation(s)

@@ -1,0 +1,37 @@
+Patient ID / UHID
+18945041/RCL18588087
+Barcode NO
+RL17494011
+Liver Function Test (LFT)
+Bilirubin Total 0.7 mg/dL 0-1.2
+Bilirubin Direct
+0.2
+mgIdL
+0-0.20
+Bilirubin Indirect
+0.5
+mg/dL
+0.1-1.0
+SGOT/AST
+69.3 UIL up to 40
+SGPT/ALT 158.6 U/L up to 41
+Alkaline Phosphatase
+90 UIL 40-129
+Total Protein 7.6 g/dL 6.4- 8.3
+Albumin 5 g/dL 3.5 -5.2
+Globulin
+2.6
+gIdL
+2.3-3.5
+Albumin :Globulin Ratio
+1.92
+-
+1.0-2.1
+SGOT/SGPT Ratio 0.44 Ratio
+Gamma Glutamyl Transferase (GGT)
+65 UIL 5-40
+REG. 72826 Consultant Pathologist
+Booking Centre :- QMS-LUPIN NOIDA, QMS-LUPIN NOIDA
+O 928-809-0609
+ccsupport@redcliffelabs.com
+www.redcliffelabs.com

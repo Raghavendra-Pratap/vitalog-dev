@@ -1,0 +1,153 @@
+{
+  "brand": "bodyline",
+  "color": {
+    "teal": {
+      "value": "#0E6B63",
+      "use": "primary, in-range status, active nav"
+    },
+    "tealDark": {
+      "value": "#0A524C",
+      "use": "text on teal tints, hover"
+    },
+    "tealTint": {
+      "value": "#DDEFEA",
+      "use": "in-range pill background, optimal band"
+    },
+    "orange": {
+      "value": "#B8561B",
+      "use": "high status, heart pulse accent"
+    },
+    "orangeText": {
+      "value": "#8A3E10",
+      "use": "text on orange tints"
+    },
+    "orangeTint": {
+      "value": "#FBE9DC",
+      "use": "high pill background"
+    },
+    "blue": {
+      "value": "#2A5CA0",
+      "use": "low status"
+    },
+    "blueText": {
+      "value": "#1E4478",
+      "use": "text on blue tints"
+    },
+    "blueTint": {
+      "value": "#E3ECF8",
+      "use": "low pill background"
+    },
+    "ink": {
+      "value": "#1C2230",
+      "use": "primary text, primary buttons"
+    },
+    "inkMuted": {
+      "value": "#4A4740",
+      "use": "body copy"
+    },
+    "inkSubtle": {
+      "value": "#6B675E",
+      "use": "secondary text, captions"
+    },
+    "paper": {
+      "value": "#F6F4EF",
+      "use": "app background"
+    },
+    "surface": {
+      "value": "#FFFDF8",
+      "use": "cards"
+    },
+    "border": {
+      "value": "#E2DDD2",
+      "use": "card borders"
+    },
+    "divider": {
+      "value": "#EFEBE2",
+      "use": "row dividers"
+    },
+    "bodyFill": {
+      "value": "#EDE3D8",
+      "use": "body map silhouette"
+    },
+    "untested": {
+      "value": "#9A968C",
+      "use": "dashed untested organs"
+    },
+    "danger": {
+      "value": "#A33A2A",
+      "use": "destructive actions"
+    }
+  },
+  "statusRule": "Never use red/green for status. High = orange, Low = blue, In range = teal. Always pair colour with a text label.",
+  "typography": {
+    "display": {
+      "family": "Fraunces",
+      "weight": 600,
+      "use": "screen titles, big numbers, wordmark (lowercase)"
+    },
+    "ui": {
+      "family": "Manrope",
+      "weights": [
+        400,
+        500,
+        600,
+        700
+      ],
+      "use": "everything else"
+    },
+    "scale": {
+      "caption": 12,
+      "small": 13,
+      "body": 14,
+      "bodyLarge": 15,
+      "title": 16,
+      "screenTitleMobile": 26,
+      "screenTitleDesktop": 30,
+      "bigValueMobile": 44,
+      "bigValueDesktop": 40
+    }
+  },
+  "radius": {
+    "pill": 8,
+    "input": 12,
+    "cardSmall": 14,
+    "card": 18,
+    "sheet": 22,
+    "appIcon": "24% of size"
+  },
+  "spacing": {
+    "screenPaddingMobile": 20,
+    "screenPaddingDesktop": 32,
+    "cardPadding": [
+      14,
+      16,
+      20
+    ],
+    "gap": [
+      8,
+      12,
+      16,
+      20
+    ]
+  },
+  "layout": {
+    "mobileArtboard": [
+      390,
+      844
+    ],
+    "desktopArtboard": [
+      1440,
+      900
+    ],
+    "desktopSidebar": 248,
+    "minTouchTarget": 44,
+    "bottomNavHeight": 76
+  },
+  "chart": {
+    "bandsFromLab": true,
+    "lastPointRadius": 8,
+    "pointRadius": 5.5,
+    "lineWidth": 2.2,
+    "medicationMarker": "dashed vertical line, 50% ink"
+  }
+}

@@ -1,0 +1,12 @@
+analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - macos/**
+    - windows/**
+    - linux/**
+include: package:flutter_lints/flutter.yaml
+linter:
+  rules:
+    prefer_const_constructors: true
