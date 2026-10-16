@@ -124,7 +124,7 @@ jobs:
           code=0
           flutter build windows --release > "$RUNNER_TEMP/windows-build.txt" 2>&1 || code=$?
           if [ "$code" -ne 0 ]; then
-            tail -30 "$RUNNER_TEMP/windows-build.txt" | while IFS= read -r line; do
+            grep -n -E "error|Error|FAILED|fatal|LNK" "$RUNNER_TEMP/windows-build.txt" | grep -v "available" | tail -40 | while IFS= read -r line; do
               echo "::error::${line:0:300}"
             done
           fi
