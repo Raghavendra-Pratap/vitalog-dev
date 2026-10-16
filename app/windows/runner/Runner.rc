@@ -94,7 +94,7 @@ BEGIN
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "Vitalog" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 app.vitalog. All rights reserved." "\0"
-            VALUE "OriginalFilename", "bodyline.exe" "\0"
+            VALUE "OriginalFilename", "Vitalog.exe" "\0"
             VALUE "ProductName", "Vitalog" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
