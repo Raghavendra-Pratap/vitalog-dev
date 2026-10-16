@@ -1,21 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../security/vitalog_secure_storage.dart';
+
 /// Persists appearance: system / light / dark.
 class ThemeController extends ChangeNotifier {
   ThemeController({FlutterSecureStorage? storage})
-      : _storage = storage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
-              mOptions: MacOsOptions(
-                synchronizable: false,
-                useDataProtectionKeyChain: false,
-                accessibility: KeychainAccessibility.first_unlock,
-              ),
-              iOptions: IOSOptions(
-                accessibility: KeychainAccessibility.first_unlock,
-              ),
-            );
+      : _storage = storage ?? vitalogSecureStorage;
 
   static const _key = 'vitalog_theme_mode_v1';
   final FlutterSecureStorage _storage;

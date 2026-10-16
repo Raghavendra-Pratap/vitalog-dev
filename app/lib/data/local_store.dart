@@ -22,8 +22,12 @@ import '../features/import/ocr_normalize.dart';
 
 /// On-device persistence — SQLCipher user.db (ADR-001).
 class LocalStore with MedicalStoreMixin, BlobVaultMixin, CareStoreMixin, HabitsNotesStoreMixin {
-  LocalStore({SecureKeys? secureKeys})
+  LocalStore({SecureKeys? secureKeys, this.documentsDirectory})
       : secureKeys = secureKeys ?? SecureKeys();
+
+  /// Isolated vault root. Null uses the normal documents directory.
+  /// A set directory skips the one-time copy from the old Mac container.
+  final Directory? documentsDirectory;
 
   final _uuid = const Uuid();
   Database? _user;
@@ -44,9 +48,12 @@ class LocalStore with MedicalStoreMixin, BlobVaultMixin, CareStoreMixin, HabitsN
   String? activeProfileId;
 
   Future<void> open() async {
-    await migrateLegacyMacContainerIfNeeded();
+    final isolated = documentsDirectory;
+    if (isolated == null) {
+      await migrateLegacyMacContainerIfNeeded();
+    }
 
-    final dir = await getApplicationDocumentsDirectory();
+    final dir = isolated ?? await getApplicationDocumentsDirectory();
     final userPath = p.join(dir.path, 'user.db');
     final plainMarker = File(p.join(dir.path, 'user.db.plain_migrated'));
     final userFile = File(userPath);

@@ -19,9 +19,9 @@ user.db
 /private/
 /corpus/
 
-# Regenerable
+# Seed build output. The shipped catalogue is app/assets/catalog/catalog.db
+# and is committed: the seed script does not produce that file.
 catalog/catalog.db
-app/assets/catalog/catalog.db
 
 # Explicit Flutter build outputs
 app/build/

@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import 'vitalog_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 
 /// PIN + optional biometric gate. Off until the user enables it.
@@ -11,19 +13,7 @@ import 'package:local_auth/local_auth.dart';
 /// Devices without enrolled biometrics never expose the toggle (safe zone).
 class AppLockController extends ChangeNotifier {
   AppLockController({FlutterSecureStorage? storage, LocalAuthentication? auth})
-      : _storage = storage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
-              // Unsigned macOS debug builds often fail with Data Protection keychain.
-              mOptions: MacOsOptions(
-                synchronizable: false,
-                useDataProtectionKeyChain: false,
-                accessibility: KeychainAccessibility.first_unlock,
-              ),
-              iOptions: IOSOptions(
-                accessibility: KeychainAccessibility.first_unlock,
-              ),
-            ),
+      : _storage = storage ?? vitalogSecureStorage,
         _auth = auth ?? LocalAuthentication();
 
   static const _enabledKey = 'bodyline_lock_enabled_v1';

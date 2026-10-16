@@ -7,14 +7,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../security/vitalog_secure_storage.dart';
+
 /// M4 local piece: recovery passphrase → encrypt/decrypt full export.
 /// Cloud sync itself is still manual (save the .blbak to Drive yourself).
 class RecoveryBackup {
   RecoveryBackup({FlutterSecureStorage? storage})
-      : _storage = storage ??
-            const FlutterSecureStorage(
-              aOptions: AndroidOptions(encryptedSharedPreferences: true),
-            );
+      : _storage = storage ?? vitalogSecureStorage;
 
   static const _hintKey = 'bodyline_recovery_hint_v1';
   static const _verifyKey = 'bodyline_recovery_verify_v1';
