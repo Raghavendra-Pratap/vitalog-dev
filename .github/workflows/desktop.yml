@@ -121,14 +121,10 @@ jobs:
         working-directory: app
         shell: bash
         run: |
-          set -o pipefail
-          flutter build windows --release 2>&1 | tee "$RUNNER_TEMP/windows-build.txt"
-          code=${PIPESTATUS[0]}
+          code=0
+          flutter build windows --release > "$RUNNER_TEMP/windows-build.txt" 2>&1 || code=$?
           if [ "$code" -ne 0 ]; then
-            grep -E "error:|error C|CMake Error|fatal error|FAILED|LNK[0-9]" "$RUNNER_TEMP/windows-build.txt" | tail -25 | while IFS= read -r line; do
-              echo "::error::${line:0:300}"
-            done
-            tail -15 "$RUNNER_TEMP/windows-build.txt" | while IFS= read -r line; do
+            tail -30 "$RUNNER_TEMP/windows-build.txt" | while IFS= read -r line; do
               echo "::error::${line:0:300}"
             done
           fi
