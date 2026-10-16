@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 const vitalogReleaseVersion = '0.2.6';
 
 const vitalogReleasesUrl =
-    'https://api.github.com/repos/Raghavendra-Pratap/vitalog-dev/releases/latest';
+    'https://api.github.com/repos/Raghavendra-Pratap/vitalog-pub/releases/latest';
 
 class AppUpdateStatus {
   const AppUpdateStatus({
