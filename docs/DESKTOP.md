@@ -1,6 +1,6 @@
 # Desktop delivery
 
-Unsigned installers are published on the public repository [vitalog-pub](https://github.com/Raghavendra-Pratap/vitalog-pub). The application source stays in this private repository. Version **0.2.6** was built before that split, so it is not attached to the public repository yet.
+Unsigned installers are published on the public repository [vitalog-pub](https://github.com/Raghavendra-Pratap/vitalog-pub/releases/tag/v0.2.6). The application source stays in this private repository. Version **0.2.6** is attached there: the disk image, the Windows setup, and the Debian package.
 
 | System | File | Install |
 |--------|------|---------|
@@ -10,7 +10,7 @@ Unsigned installers are published on the public repository [vitalog-pub](https:/
 
 macOS will say the developer cannot be verified. Windows SmartScreen will ask before the setup runs. Signing is a later step. These installers do not remove those warnings.
 
-The release is attached by the desktop workflow on `main` when the tests and the three builds pass. The workflow does not deploy the website.
+The desktop workflow on `main` builds the three installers and attaches them to a release of this private repository. It does not deploy the website, and it does not publish that release on vitalog-pub. Copy the three files onto the public release when a version should be downloadable.
 
 ## How an installed copy updates
 
