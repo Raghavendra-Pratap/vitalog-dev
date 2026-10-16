@@ -23,6 +23,8 @@ import '../visits/care_screen.dart';
 import '../visits/visit_forms.dart';
 import '../visits/reminders_screen.dart';
 import '../medicines/medicines_screen.dart';
+import '../medicines/dose_wait_controller.dart';
+import '../medicines/dose_wait_header_chip.dart';
 import '../doctor/doctors_screen.dart';
 import '../tests/all_tests_screen.dart';
 import '../today/today_screen.dart';
@@ -55,6 +57,8 @@ class _DesktopShellState extends State<DesktopShell> {
   final GlobalKey<TodayScreenState> _todayKey = GlobalKey<TodayScreenState>();
   final GlobalKey<HabitsScreenState> _habitsKey = GlobalKey<HabitsScreenState>();
   final GlobalKey<NotesScreenState> _notesKey = GlobalKey<NotesScreenState>();
+  String? _testsFocusCode;
+  final TextEditingController _notesSearch = TextEditingController();
   static const _prefsKey = 'desktop_sidebar_collapsed';
   int _nav = 0;
   bool _familyOpen = false;
@@ -81,6 +85,8 @@ class _DesktopShellState extends State<DesktopShell> {
 
   @override
   void dispose() {
+    _notesSearch.dispose();
+
     widget.sync.removeListener(_onSync);
     super.dispose();
   }
@@ -89,9 +95,41 @@ class _DesktopShellState extends State<DesktopShell> {
     if (mounted) setState(() {});
   }
 
-  void _refresh() {
+      Future<void> _openSettings() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(
+          store: widget.store,
+          lock: widget.lock,
+          theme: widget.theme,
+          sync: widget.sync,
+          onChanged: _refresh,
+          desktop: true,
+        ),
+      ),
+    );
+    _refresh();
+  }
+
+void _openRunningDoseWait() {
+    final mode = DoseWaitController.instance.mode;
+    setState(() {
+      _familyOpen = false;
+      _nav = 8;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _remindersKey.currentState?.openTool(mode);
+    });
+  }
+
+void _refresh() {
     setState(() {});
     widget.sync.scheduleSyncSoon();
+    // IndexedStack keeps panes alive — push habit/today reloads so logs sync.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _habitsKey.currentState?.reload();
+      _todayKey.currentState?.reload();
+    });
   }
 
   String _todayDateLabel() {
@@ -129,7 +167,6 @@ class _DesktopShellState extends State<DesktopShell> {
       9 => 'Visits',
       10 => 'Doctors',
       11 => 'Health profile',
-      12 => 'Settings',
       _ => 'Vitalog',
     };
   }
@@ -171,7 +208,10 @@ class _DesktopShellState extends State<DesktopShell> {
       return 'Things reports and prescriptions don’t say${p != null ? ' · ${p.name}' : ''}';
     }
     if (_nav == 6) return 'Schedule and stock on this device. Dose Taken / Skip is under Reminders.';
-    if (_nav == 7) return 'Daily check-ins on this device — not streaks or advice';
+    if (_nav == 7) {
+      final name = p?.name ?? 'you';
+      return 'Habits for $name · progress counted in days, never streaks';
+    }
     if (_nav == 8) return 'Retests, follow-ups, and the dose wait timer';
     if (_nav == 9) return 'Doctor visits and follow-ups';
     if (_nav == 10) return 'Doctors from visits plus notes and files';
@@ -198,10 +238,27 @@ class _DesktopShellState extends State<DesktopShell> {
             selected: _familyOpen ? -1 : _nav,
             collapsed: _sidebarCollapsed,
             onToggleCollapsed: _toggleSidebar,
-            onSelect: (i) => setState(() {
-              _familyOpen = false;
-              _nav = i;
-            }),
+            onSelect: (i) {
+              setState(() {
+                _familyOpen = false;
+                _nav = i;
+              });
+              if (i == 5) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _notesKey.currentState?.reload();
+                });
+              }
+              if (i == 1) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _todayKey.currentState?.reload();
+                });
+              }
+              if (i == 7) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _habitsKey.currentState?.reload();
+                });
+              }
+            },
             onSwitchProfile: () => setState(() => _familyOpen = true),
           ),
           Expanded(
@@ -234,6 +291,7 @@ class _DesktopShellState extends State<DesktopShell> {
                     }
                   },
                   onAddNote: () => _notesKey.currentState?.promptAdd(),
+                  notesSearch: _notesSearch,
                   onAddReport: _openAdd,
                   onAddVisit: () async {
                     final ok = await promptAddVisit(
@@ -260,6 +318,8 @@ class _DesktopShellState extends State<DesktopShell> {
                     context: context,
                     store: widget.store,
                   ),
+                  onOpenDoseWait: _openRunningDoseWait,
+                  onOpenSettings: _openSettings,
                 ),
                 Expanded(
                   child: _familyOpen
@@ -272,7 +332,7 @@ class _DesktopShellState extends State<DesktopShell> {
                           },
                         )
                       : IndexedStack(
-                          index: _nav,
+                          index: _nav.clamp(0, 11),
                           children: [
                             HomeScreen(
                               store: widget.store,
@@ -297,13 +357,16 @@ class _DesktopShellState extends State<DesktopShell> {
                               desktop: true,
                             ),
                             TestsScreen(
+                              key: ValueKey('tests-${_testsFocusCode ?? 'default'}'),
                               store: widget.store,
                               onChanged: _refresh,
                               desktop: true,
+                              initialParameterCode: _testsFocusCode,
                             ),
                             RecordsScreen(
                               store: widget.store,
                               onAdd: _openAdd,
+                              onChanged: _refresh,
                               desktop: true,
                             ),
                             NotesScreen(
@@ -311,6 +374,25 @@ class _DesktopShellState extends State<DesktopShell> {
                               store: widget.store,
                               onChanged: _refresh,
                               embedded: true,
+                              searchController: _notesSearch,
+                              onOpenChart: (raw) {
+                                String code = raw;
+                                final pid = widget.store.activeProfileId;
+                                for (final o in widget.store.observations) {
+                                  if (pid != null && o.profileId != pid) continue;
+                                  if (o.parameterCode == raw ||
+                                      o.parameterName == raw ||
+                                      o.parameterName.toLowerCase() ==
+                                          raw.toLowerCase()) {
+                                    code = o.parameterCode;
+                                    break;
+                                  }
+                                }
+                                setState(() {
+                                  _testsFocusCode = code;
+                                  _nav = 3;
+                                });
+                              },
                             ),
                             MedicinesScreen(
                               key: _medicinesKey,
@@ -352,14 +434,6 @@ class _DesktopShellState extends State<DesktopShell> {
                                 _familyOpen = false;
                                 _nav = i;
                               }),
-                            ),
-                            SettingsScreen(
-                              store: widget.store,
-                              lock: widget.lock,
-                              theme: widget.theme,
-                              sync: widget.sync,
-                              onChanged: _refresh,
-                              desktop: true,
                             ),
                           ],
                         ),
@@ -463,6 +537,9 @@ class _DesktopTopBar extends StatelessWidget {
     this.onAddFamily,
     this.onEmergency,
     this.onDoctorPdf,
+    this.onOpenDoseWait,
+    this.onOpenSettings,
+    this.notesSearch,
   });
 
   final String title;
@@ -479,6 +556,9 @@ class _DesktopTopBar extends StatelessWidget {
   final VoidCallback? onAddFamily;
   final VoidCallback? onEmergency;
   final VoidCallback? onDoctorPdf;
+  final VoidCallback? onOpenDoseWait;
+  final VoidCallback? onOpenSettings;
+  final TextEditingController? notesSearch;
 
   @override
   Widget build(BuildContext context) {
@@ -513,6 +593,8 @@ class _DesktopTopBar extends StatelessWidget {
               ],
             ),
           ),
+          if (onOpenDoseWait != null)
+            DoseWaitHeaderChip(onOpen: onOpenDoseWait!),
           ..._actions(context),
         ],
       ),
@@ -535,17 +617,15 @@ class _DesktopTopBar extends StatelessWidget {
           ),
         ];
       case _TopMode.health:
-        // Temporarily hidden — restore Doctor summary (PDF) when ready.
-        // return [
-        //   FilledButton.icon(
-        //     onPressed: onDoctorPdf,
-        //     style: _ink(),
-        //     icon: const Icon(Icons.download_outlined, size: 18),
-        //     label: const Text('Doctor summary (PDF)',
-        //         style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-        //   ),
-        // ];
-        return const [];
+        return [
+          OutlinedButton.icon(
+            onPressed: onOpenSettings,
+            style: _outline(),
+            icon: const Icon(Icons.settings_outlined, size: 18),
+            label: const Text('Settings',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+          ),
+        ];
       case _TopMode.records:
         return [
           OutlinedButton.icon(
@@ -586,6 +666,28 @@ class _DesktopTopBar extends StatelessWidget {
         ];
       case _TopMode.notes:
         return [
+          if (notesSearch != null) ...[
+            SizedBox(
+              width: 220,
+              height: 40,
+              child: TextField(
+                controller: notesSearch,
+                decoration: InputDecoration(
+                  hintText: 'Search notes',
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                  isDense: true,
+                  filled: true,
+                  fillColor: BodylineColors.chip,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
           FilledButton.icon(
             onPressed: onAddNote,
             icon: const Icon(Icons.add, size: 18),
@@ -937,14 +1039,6 @@ class _Sidebar extends StatelessWidget {
             selected: selected == 11,
             collapsed: collapsed,
             onTap: () => onSelect(11),
-          ),
-          _NavItem(
-            icon: Icons.settings_outlined,
-            selectedIcon: Icons.settings,
-            label: 'Settings',
-            selected: selected == 12,
-            collapsed: collapsed,
-            onTap: () => onSelect(12),
           ),
           if (!collapsed) ...[
             const SizedBox(height: 12),

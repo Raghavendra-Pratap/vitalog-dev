@@ -84,9 +84,9 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Vitalog reads photos you select so it can recognize lab report text on this device. Images stay on this device.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Vitalog can read weight, glucose, and blood pressure you already keep in Apple Health so they appear in your on-device log. Nothing is sent to Vitalog servers.</string>
+	<string>Vitalog can read weight, glucose, blood pressure, steps, and sleep duration you already keep in Apple Health so they appear in your on-device log. Nothing is sent to Vitalog servers.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>When you allow it, Vitalog can save weight, glucose, and blood pressure you enter here into Apple Health. Data stays under your Apple ID.</string>
+	<string>When you allow it, Vitalog can save weight, glucose, blood pressure, steps, and sleep duration you enter here into Apple Health. Data stays under your Apple ID.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

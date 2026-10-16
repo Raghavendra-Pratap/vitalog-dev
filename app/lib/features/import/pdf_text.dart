@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'ocr_normalize.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:bodyline_core/bodyline_core.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
 import '../../theme/tokens.dart';
@@ -22,10 +23,13 @@ class PdfExtractResult {
   const PdfExtractResult({
     required this.status,
     this.text,
+    this.boxes,
   });
 
   final PdfExtractStatus status;
   final String? text;
+  /// Positioned words when Syncfusion text lines expose bounds; else null.
+  final List<WordBox>? boxes;
 }
 
 /// Best-effort PDF text for import (Android + desktop).
@@ -148,6 +152,7 @@ PdfExtractResult _extractWithSyncfusionBytes(
       final extractor = PdfTextExtractor(document);
       final pageCount = document.pages.count;
       final buf = StringBuffer();
+      final boxes = <WordBox>[];
       for (var i = 0; i < pageCount; i++) {
         // Prefer layout-aware extract (Agilus-style positioned tables),
         // then word-bounded text lines sorted by reading order.
@@ -160,8 +165,19 @@ PdfExtractResult _extractWithSyncfusionBytes(
           startPageIndex: i,
           endPageIndex: i,
         );
+        boxes.addAll(_wordBoxesFromPdfLines(lines, page: i + 1));
         final fromLines = _textFromPdfLines(lines);
-        final pageText = _pickBetterPdfPageText(layout, fromLines);
+        final fromBoxes = boxes.where((b) => b.page == i + 1).isNotEmpty
+            ? layoutRowsToText(
+                rebuildLayout(
+                  [for (final b in boxes) if (b.page == i + 1) b],
+                ),
+              )
+            : '';
+        final pageText = _pickBetterPdfPageText(
+          layout,
+          _pickBetterPdfPageText(fromLines, fromBoxes),
+        );
         if (pageText.trim().isEmpty) continue;
         if (buf.isNotEmpty) buf.writeln();
         buf.writeln('--- page ${i + 1} of $pageCount ---');
@@ -169,7 +185,7 @@ PdfExtractResult _extractWithSyncfusionBytes(
       }
       final text = buf.toString().trim();
       debugPrint(
-        'pdf_text: Syncfusion pages=$pageCount chars=${text.length}',
+        'pdf_text: Syncfusion pages=$pageCount chars=${text.length} boxes=${boxes.length}',
       );
       try {
         File('/tmp/vitalog_last_extract.txt').writeAsStringSync(text);
@@ -180,6 +196,7 @@ PdfExtractResult _extractWithSyncfusionBytes(
       return PdfExtractResult(
         status: PdfExtractStatus.ok,
         text: normalizeOcrLabText(text),
+        boxes: boxes.isEmpty ? null : boxes,
       );
     } finally {
       document.dispose();
@@ -188,6 +205,36 @@ PdfExtractResult _extractWithSyncfusionBytes(
     debugPrint('pdf_text: Syncfusion extract failed: $e');
     return const PdfExtractResult(status: PdfExtractStatus.failed);
   }
+}
+
+
+/// Like [extractPdfTextInteractive] but keeps WordBoxes when available.
+Future<PdfExtractResult?> extractPdfResultInteractive(
+  BuildContext context, {
+  String? path,
+  Uint8List? bytes,
+}) async {
+  var result = await extractPdfText(path, bytes: bytes);
+  if (result.status == PdfExtractStatus.ok) return result;
+
+  if (result.status == PdfExtractStatus.needsPassword ||
+      result.status == PdfExtractStatus.wrongPassword) {
+    while (true) {
+      if (!context.mounted) return null;
+      final password = await _askPdfPassword(
+        context,
+        wrong: result.status == PdfExtractStatus.wrongPassword,
+      );
+      if (password == null) return null;
+      result = await extractPdfText(path, bytes: bytes, password: password);
+      if (result.status == PdfExtractStatus.ok) return result;
+      if (result.status != PdfExtractStatus.wrongPassword &&
+          result.status != PdfExtractStatus.needsPassword) {
+        break;
+      }
+    }
+  }
+  return null;
 }
 
 /// Pick → unlock if needed → return text (or null if cancelled / failed).
@@ -354,6 +401,53 @@ Future<String?> _which(String cmd) async {
   return null;
 }
 
+
+
+List<WordBox> _wordBoxesFromPdfLines(List<TextLine> lines, {required int page}) {
+  final out = <WordBox>[];
+  for (final line in lines) {
+    final words = line.wordCollection;
+    if (words.isNotEmpty) {
+      for (final w in words) {
+        final text = w.text.trim();
+        if (text.isEmpty) continue;
+        final b = w.bounds;
+        final ww = b.width.abs() < 1 ? 1.0 : b.width.abs();
+        final hh = b.height.abs() < 1 ? 1.0 : b.height.abs();
+        out.add(
+          WordBox(
+            text: text,
+            x: b.left,
+            y: b.top,
+            w: ww,
+            h: hh,
+            conf: 100,
+            page: page,
+            source: WordBoxSource.textLayer,
+            font: w.fontName,
+          ),
+        );
+      }
+    } else {
+      final text = line.text.trim();
+      if (text.isEmpty) continue;
+      final b = line.bounds;
+      out.add(
+        WordBox(
+          text: text,
+          x: b.left,
+          y: b.top,
+          w: b.width.abs() < 1 ? 1.0 : b.width.abs(),
+          h: b.height.abs() < 1 ? 1.0 : b.height.abs(),
+          conf: 100,
+          page: page,
+          source: WordBoxSource.textLayer,
+        ),
+      );
+    }
+  }
+  return out;
+}
 
 String _textFromPdfLines(List<TextLine> lines) {
   if (lines.isEmpty) return '';

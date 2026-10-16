@@ -16,13 +16,17 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
-    <!-- Google Health Connect (opt-in vitals: weight, glucose, BP) -->
+    <!-- Google Health Connect (ADR-011 / 011a: weight, glucose, BP, steps, sleep) -->
     <uses-permission android:name="android.permission.health.READ_WEIGHT"/>
     <uses-permission android:name="android.permission.health.WRITE_WEIGHT"/>
     <uses-permission android:name="android.permission.health.READ_BLOOD_GLUCOSE"/>
     <uses-permission android:name="android.permission.health.WRITE_BLOOD_GLUCOSE"/>
     <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE"/>
     <uses-permission android:name="android.permission.health.WRITE_BLOOD_PRESSURE"/>
+    <uses-permission android:name="android.permission.health.READ_STEPS"/>
+    <uses-permission android:name="android.permission.health.WRITE_STEPS"/>
+    <uses-permission android:name="android.permission.health.READ_SLEEP"/>
+    <uses-permission android:name="android.permission.health.WRITE_SLEEP"/>
     <application
         android:allowBackup="false"
         android:fullBackupContent="false"

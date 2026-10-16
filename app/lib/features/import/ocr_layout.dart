@@ -1,3 +1,4 @@
+import 'package:bodyline_core/bodyline_core.dart';
 /// Geometry-aware OCR line reconstruction (ML Kit / Vision-style).
 ///
 /// ML Kit often returns left-column analyte names and right-column values as
@@ -29,6 +30,47 @@ class OcrBox {
 }
 
 /// Admin / footer OCR tokens (Agilus PERFORMED AT, ULR, emails, page X of Y).
+
+
+/// OCR output with optional WordBoxes for layout-first parse.
+class OcrExtractResult {
+  const OcrExtractResult({required this.text, this.boxes = const []});
+  final String text;
+  final List<WordBox> boxes;
+}
+
+/// Convert ML Kit / Vision-style [OcrBox]es to core [WordBox] (page coords).
+List<WordBox> wordBoxesFromOcrBoxes(
+  List<OcrBox> boxes, {
+  int page = 1,
+  WordBoxSource source = WordBoxSource.ocr,
+}) {
+  return [
+    for (final b in boxes)
+      if (b.text.trim().isNotEmpty)
+        WordBox(
+          text: b.text.trim(),
+          x: b.left,
+          y: b.top,
+          w: (b.right - b.left).abs() < 1 ? 1.0 : (b.right - b.left).abs(),
+          h: (b.bottom - b.top).abs() < 1 ? 1.0 : (b.bottom - b.top).abs(),
+          conf: 90,
+          page: page,
+          source: source,
+        ),
+  ];
+}
+
+/// Prefer core layout rebuild; fall back to legacy stitch when sparse.
+String layoutTextFromOcrBoxes(List<OcrBox> boxes) {
+  final wb = wordBoxesFromOcrBoxes(boxes);
+  if (wb.length >= 4) {
+    final text = layoutRowsToText(rebuildLayout(wb));
+    if (text.trim().isNotEmpty) return text;
+  }
+  return layoutOcrByGeometry(boxes);
+}
+
 bool isOcrFooterNoiseText(String raw) {
   final t = raw.trim();
   if (t.isEmpty) return false;

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'ocr_exception.dart';
+import 'ocr_layout.dart';
 import 'ocr_normalize.dart';
 
 /// Desktop image pick + OCR.
@@ -58,6 +59,13 @@ class OcrService {
 
   Future<String?> recognizeFile(String path) =>
       recognizeXFile(XFile(path));
+
+  Future<OcrExtractResult?> recognizeXFileDetailed(XFile file) async {
+    final text = await recognizeXFile(file);
+    if (text == null || text.trim().isEmpty) return null;
+    return OcrExtractResult(text: text);
+  }
+
 
   Future<String?> recognizeXFile(XFile file) async {
     if (!Platform.isMacOS) {

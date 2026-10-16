@@ -18,6 +18,8 @@ class RecoveryBackup {
 
   static const _hintKey = 'bodyline_recovery_hint_v1';
   static const _verifyKey = 'bodyline_recovery_verify_v1';
+  static const _secretKey = 'bodyline_recovery_secret_v1';
+  static const _lastMetaName = 'latest.json';
 
   final FlutterSecureStorage _storage;
 
@@ -33,6 +35,7 @@ class RecoveryBackup {
     final key = _randomKey();
     final verify = await _encryptString('bodyline-ok', key);
     await _storage.write(key: _verifyKey, value: verify);
+    await _storage.write(key: _secretKey, value: key);
     if (hint != null && hint.trim().isNotEmpty) {
       await _storage.write(key: _hintKey, value: hint.trim());
     }
@@ -48,6 +51,67 @@ class RecoveryBackup {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Key stays in the device keystore so it can be copied later without being shown.
+  Future<void> rememberRecoveryKey(String recoveryKey) async {
+    final trimmed = recoveryKey.trim();
+    if (trimmed.isEmpty) return;
+    await _storage.write(key: _secretKey, value: trimmed);
+  }
+
+  Future<String?> storedRecoveryKey() async {
+    final v = await _storage.read(key: _secretKey);
+    if (v == null || v.isEmpty) return null;
+    return v;
+  }
+
+  Future<LastBackupInfo?> lastBackup() async {
+    final file = File(p.join(await _backupDirPath(), _lastMetaName));
+    if (!file.existsSync()) return null;
+    try {
+      final map = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final name = map['name'] as String?;
+      final path = map['path'] as String?;
+      final at = DateTime.tryParse(map['created_at'] as String? ?? '');
+      if (name == null || path == null || at == null) return null;
+      if (!File(path).existsSync()) return null;
+      return LastBackupInfo(name: name, createdAt: at, path: path);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Copies a sealed backup into app documents and records it as the latest.
+  Future<File> retainBackup(File source, {required String recoveryKey}) async {
+    await rememberRecoveryKey(recoveryKey);
+    final dir = await _backupDirPath();
+    final now = DateTime.now();
+    final name =
+        'vitalog-${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}-'
+        '${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}.blbak';
+    final dest = File(p.join(dir, name));
+    await source.copy(dest.path);
+    final meta = File(p.join(dir, _lastMetaName));
+    await meta.writeAsString(
+      jsonEncode({
+        'name': name,
+        'path': dest.path,
+        'created_at': now.toIso8601String(),
+      }),
+      flush: true,
+    );
+    return dest;
+  }
+
+  Future<String> _backupDirPath() async {
+    final docs = await getApplicationDocumentsDirectory();
+    final dir = Directory(p.join(docs.path, 'backups'));
+    if (!dir.existsSync()) await dir.create(recursive: true);
+    return dir.path;
   }
 
   Future<File> wrapExportJson(String json, String recoveryKey) async {
@@ -126,3 +190,16 @@ class RecoveryBackup {
     return utf8.decode(clear);
   }
 }
+
+class LastBackupInfo {
+  const LastBackupInfo({
+    required this.name,
+    required this.createdAt,
+    required this.path,
+  });
+
+  final String name;
+  final DateTime createdAt;
+  final String path;
+}
+

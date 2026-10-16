@@ -25,6 +25,9 @@ class ReminderNotifications {
   static const _channelDesc = 'Care reminders and medicine dose times you set.';
 
   static const _doseChannelId = 'vitalog_doses';
+  static const _habitChannelId = 'vitalog_habits';
+  static const _habitChannelName = 'Habits';
+  static const _habitChannelDesc = 'Daily habit check-in reminders you set.';
   static const _doseChannelName = 'Medicine doses';
   static const _doseChannelDesc = 'Daily reminders to take medicines and remedies.';
 
@@ -76,6 +79,14 @@ class ReminderNotifications {
           _doseChannelName,
           description: _doseChannelDesc,
           importance: Importance.high,
+        ),
+      );
+      await android?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          _habitChannelId,
+          _habitChannelName,
+          description: _habitChannelDesc,
+          importance: Importance.defaultImportance,
         ),
       );
       await android?.createNotificationChannel(
@@ -471,4 +482,85 @@ class ReminderNotifications {
       payload: 'dose|$medicationId|$timeHm',
     );
   }
+
+  int _habitId(String habitId) =>
+      Object.hash('habit', habitId) & 0x7fffffff;
+
+  Future<void> scheduleDailyHabit({
+    required String habitId,
+    required String timeHm,
+    required String title,
+  }) async {
+    if (!_ready || kIsWeb) return;
+    final parts = timeHm.split(':');
+    if (parts.length < 2) return;
+    final h = int.tryParse(parts[0]) ?? -1;
+    final m = int.tryParse(parts[1]) ?? -1;
+    if (h < 0 || m < 0) return;
+
+    final id = _habitId(habitId);
+    await _plugin.cancel(id);
+
+    final now = tz.TZDateTime.now(tz.local);
+    var when = tz.TZDateTime(tz.local, now.year, now.month, now.day, h, m);
+    if (!when.isAfter(now)) {
+      when = when.add(const Duration(days: 1));
+    }
+
+    await _plugin.zonedSchedule(
+      id,
+      title,
+      'Check in on Today when you can — not medical advice.',
+      when,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _habitChannelId,
+          _habitChannelName,
+          channelDescription: _habitChannelDesc,
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+        macOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      androidScheduleMode: await _scheduleMode(),
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
+      payload: 'habit|$habitId|$timeHm',
+    );
+  }
+
+  Future<void> cancelDailyHabit(String habitId) async {
+    if (!_ready || kIsWeb) return;
+    await _plugin.cancel(_habitId(habitId));
+  }
+
+  Future<void> rescheduleAllHabits(
+    Iterable<Map<String, Object?>> habits,
+  ) async {
+    if (!_ready || kIsWeb) return;
+    for (final h in habits) {
+      final id = h['id'] as String?;
+      if (id == null) continue;
+      final enabled = ((h['reminder_enabled'] as int?) ?? 0) == 1;
+      final hm = h['reminder_hm'] as String?;
+      if (!enabled || hm == null || hm.trim().isEmpty) {
+        await cancelDailyHabit(id);
+        continue;
+      }
+      final title = h['title'] as String? ?? 'Habit';
+      await scheduleDailyHabit(habitId: id, timeHm: hm.trim(), title: title);
+    }
+  }
+
+
 }

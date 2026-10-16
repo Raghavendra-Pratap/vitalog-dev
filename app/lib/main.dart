@@ -78,6 +78,8 @@ Future<void> main() async {
     await ReminderNotifications.instance.rescheduleAll(all);
     final doses = await store.listAllMedicationSchedules();
     await ReminderNotifications.instance.rescheduleAllDoses(doses);
+    final habits = await store.listAllHabits();
+    await ReminderNotifications.instance.rescheduleAllHabits(habits);
   } catch (_) {}
   runApp(BodylineApp(store: store, lock: lock, theme: theme, sync: sync));
 }

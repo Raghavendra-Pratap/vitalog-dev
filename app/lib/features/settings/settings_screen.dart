@@ -1,8 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../data/catalog_host.dart';
+import '../../data/drug_index.dart';
 import '../../data/local_store.dart';
 import '../../data/recovery_backup.dart';
 import 'package:file_picker/file_picker.dart';
@@ -43,14 +46,130 @@ class _SettingsScreenState extends State<SettingsScreen> {
   AppLockController get lock => widget.lock;
   final _recovery = RecoveryBackup();
   bool _hasRecovery = false;
+  bool _canCopyRecovery = false;
+  LastBackupInfo? _lastBackup;
+  String _medicineLibStatus = 'Loading…';
+  bool _medicineLibUpdating = false;
+  String _catalogStatus = 'Loading…';
+  bool _catalogUpdating = false;
 
   @override
   void initState() {
     super.initState();
     _refreshBioAvailability();
-    _recovery.hasRecoveryKey().then((v) {
-      if (mounted) setState(() => _hasRecovery = v);
+    _refreshMedicineLibraryStatus();
+    _refreshCatalogStatus();
+    _loadBackupMeta();
+  }
+
+  Future<void> _loadBackupMeta() async {
+    final has = await _recovery.hasRecoveryKey();
+    final stored = await _recovery.storedRecoveryKey();
+    final last = await _recovery.lastBackup();
+    if (!mounted) return;
+    setState(() {
+      _hasRecovery = has;
+      _canCopyRecovery = stored != null;
+      _lastBackup = last;
     });
+  }
+
+  Future<void> _copyRecoveryKey() async {
+    final key = await _recovery.storedRecoveryKey();
+    if (!mounted || key == null || key.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: key));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Copied.')),
+    );
+  }
+
+  Widget _lastBackupRow(BuildContext context) {
+    final backup = _lastBackup;
+    if (backup == null) return const SizedBox.shrink();
+    final when = DateFormat('d MMM yyyy, h:mm a').format(backup.createdAt);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 8, 4, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  backup.name,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                ),
+                Text(when, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          if (_canCopyRecovery)
+            IconButton(
+              tooltip: 'Copy recovery key',
+              onPressed: _copyRecoveryKey,
+              icon: Icon(Icons.copy_outlined, color: BodylineColors.inkMuted),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _refreshMedicineLibraryStatus() async {
+    final line = await DrugIndex.instance.statusLine();
+    if (mounted) setState(() => _medicineLibStatus = line);
+  }
+
+  Future<void> _updateMedicineLibrary() async {
+    if (_medicineLibUpdating) return;
+    setState(() => _medicineLibUpdating = true);
+    try {
+      final result = await DrugIndex.instance.updateFromHost();
+      if (!mounted) return;
+      await _refreshMedicineLibraryStatus();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message)),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not update the medicine library. Try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _medicineLibUpdating = false);
+    }
+  }
+
+  Future<void> _refreshCatalogStatus() async {
+    final line = await CatalogHost.instance.statusLine();
+    if (mounted) setState(() => _catalogStatus = line);
+  }
+
+  Future<void> _updateCatalog() async {
+    if (_catalogUpdating) return;
+    setState(() => _catalogUpdating = true);
+    try {
+      final result = await store.updateCatalogFromHost();
+      if (!mounted) return;
+      await _refreshCatalogStatus();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message)),
+      );
+      if (result.updated) widget.onChanged?.call();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not update the catalogue. Try again.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _catalogUpdating = false);
+    }
   }
 
   Future<void> _refreshBioAvailability() async {
@@ -85,8 +204,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       widget.desktop ? 32 : 20,
       widget.desktop ? 28 : 32,
     );
+    final canPop = ModalRoute.of(context)?.canPop ?? false;
     return Scaffold(
-      appBar: widget.desktop ? null : AppBar(title: const Text('Settings')),
+      appBar: (!widget.desktop || canPop)
+          ? AppBar(title: const Text('Settings'))
+          : null,
       backgroundColor: BodylineColors.paper,
       body: ListenableBuilder(
         listenable: lock,
@@ -221,6 +343,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: 'JSON sealed with your recovery key',
               onTap: _encryptedBackup,
             ),
+            if (_lastBackup != null) ...[
+              Divider(height: 1, color: BodylineColors.divider),
+              _lastBackupRow(context),
+            ],
             Divider(height: 1, color: BodylineColors.divider),
             _tapRow(
               context,
@@ -249,7 +375,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _infoRow(
               context,
               title: 'Tests catalogue',
-              subtitle: '193 parameters · 20 panels · vitalog catalogue v1',
+              subtitle: _catalogStatus,
+            ),
+            Divider(height: 1, color: BodylineColors.divider),
+            _tapRow(
+              context,
+              title: _catalogUpdating
+                  ? 'Updating catalogue…'
+                  : 'Update catalogue',
+              subtitle:
+                  'Panels and aliases from vitalog.cc — not medical advice',
+              onTap: _catalogUpdating ? () {} : _updateCatalog,
+            ),
+            Divider(height: 1, color: BodylineColors.divider),
+            _infoRow(
+              context,
+              title: 'Medicine library',
+              subtitle: _medicineLibStatus,
+            ),
+            Divider(height: 1, color: BodylineColors.divider),
+            _tapRow(
+              context,
+              title: _medicineLibUpdating
+                  ? 'Updating medicine library…'
+                  : 'Update medicine library',
+              subtitle:
+                  'Name suggestions from vitalog.cc — not advice or diagnosis',
+              onTap: _medicineLibUpdating ? () {} : _updateMedicineLibrary,
             ),
             Divider(height: 1, color: BodylineColors.divider),
             _tapRow(
@@ -363,6 +515,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             actionLabel: 'Backup',
             onAction: _encryptedBackup,
           ),
+          if (_lastBackup != null) ...[
+            Divider(height: 1, color: BodylineColors.divider),
+            _lastBackupRow(context),
+          ],
           Divider(height: 1, color: BodylineColors.divider),
           _actionRow(
             icon: Icons.devices_outlined,
@@ -472,16 +628,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _actionRow(
             icon: Icons.show_chart_outlined,
             title: 'Catalogue version',
-            subtitle:
-                'v1.0 · 193 parameters · 20 panels · vitalog catalogue v1',
-            actionLabel: 'Details',
-            onAction: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Catalogue updates ship with app releases.'),
-                ),
-              );
-            },
+            subtitle: _catalogStatus,
+            actionLabel: _catalogUpdating ? 'Updating…' : 'Update',
+            onAction: _catalogUpdating ? () {} : _updateCatalog,
+          ),
+          Divider(height: 1, color: BodylineColors.divider),
+          _actionRow(
+            icon: Icons.medication_outlined,
+            title: 'Medicine library',
+            subtitle: _medicineLibStatus,
+            actionLabel: _medicineLibUpdating ? 'Updating…' : 'Update',
+            onAction: _medicineLibUpdating ? () {} : _updateMedicineLibrary,
           ),
           Divider(height: 1, color: BodylineColors.divider),
           _actionRow(
@@ -966,23 +1123,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Store this recovery key'),
-        content: SelectableText(
-          key,
-          style: const TextStyle(
-            fontFamily: 'Menlo',
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
+      builder: (ctx) {
+        var copied = false;
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: const Text('Store this recovery key'),
+            content: SelectableText(
+              key,
+              style: const TextStyle(
+                fontFamily: 'Menlo',
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  await Clipboard.setData(ClipboardData(text: key));
+                  setLocal(() => copied = true);
+                },
+                child: Text(copied ? 'Copied' : 'Copy'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('I wrote it down'),
+              ),
+            ],
           ),
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('I wrote it down'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1021,10 +1190,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final jsonFile = await store.exportJsonArchive();
     final json = await jsonFile.readAsString();
     final bak = await _recovery.wrapExportJson(json, key);
+    final kept = await _recovery.retainBackup(bak, recoveryKey: key);
     if (!mounted) return;
-    final path = bak.path;
+    await _loadBackupMeta();
+    if (!mounted) return;
     await Share.shareXFiles(
-      [XFile(path)],
+      [XFile(kept.path)],
       subject: 'Vitalog encrypted backup',
     );
   }

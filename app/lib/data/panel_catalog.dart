@@ -1,6 +1,6 @@
 /// Panel/param types + offline seed fallback.
 /// Source of truth: `assets/catalog/catalog.db` via [LocalStore.catalogPanels]
-/// (vitalog CSV v1 → 193 params / 20 panels).
+/// (catalogue v2.1 → ~202 params / 21 panels; seed below is offline fallback).
 class PanelDef {
   const PanelDef(this.code, this.name, this.parameters);
   final String code;

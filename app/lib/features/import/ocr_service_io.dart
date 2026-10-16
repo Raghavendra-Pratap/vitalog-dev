@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:image_picker/image_picker.dart';
 
+import 'ocr_layout.dart';
 import 'ocr_service_desktop.dart' as desktop;
 import 'ocr_service_mobile.dart' as mobile;
 
@@ -26,4 +27,14 @@ class OcrService {
 
   Future<String?> recognizeXFile(XFile file) =>
       _impl.recognizeXFile(file) as Future<String?>;
+
+  Future<OcrExtractResult?> recognizeXFileDetailed(XFile file) async {
+    try {
+      return await _impl.recognizeXFileDetailed(file) as OcrExtractResult?;
+    } catch (_) {
+      final text = await recognizeXFile(file);
+      if (text == null || text.trim().isEmpty) return null;
+      return OcrExtractResult(text: text);
+    }
+  }
 }

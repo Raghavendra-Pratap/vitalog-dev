@@ -10,8 +10,6 @@ import '../../theme/tokens.dart';
 import '../../widgets/report_title.dart';
 import '../../widgets/clinical_attachments.dart';
 import 'report_detail_screen.dart';
-import 'notes_screen.dart';
-import 'timeline_screen.dart';
 import '../entry/manual_panel_screen.dart';
 
 enum _RecFilter { all, reports, visits, documents, byDay }
@@ -21,12 +19,15 @@ class RecordsScreen extends StatefulWidget {
     super.key,
     required this.store,
     required this.onAdd,
+    this.onChanged,
     this.desktop = false,
     this.asPage = false,
   });
 
   final LocalStore store;
   final VoidCallback onAdd;
+  /// Bubbles note/timeline edits so sibling screens (sidebar Notes) refresh.
+  final VoidCallback? onChanged;
   final bool desktop;
   /// Pushed from Profile — AppBar + back instead of tab-root header.
   final bool asPage;
@@ -38,6 +39,7 @@ class RecordsScreen extends StatefulWidget {
 class _RecordsScreenState extends State<RecordsScreen> {
   _RecFilter _filter = _RecFilter.all;
   String? _selectedId;
+  String? _selectedDayKey;
   List<VisitRecord> _visits = [];
   List<AttachmentRecord> _docs = [];
   var _extraLoading = false;
@@ -83,7 +85,15 @@ class _RecordsScreenState extends State<RecordsScreen> {
   }
 
   Future<void> _setFilter(_RecFilter f) async {
-    setState(() => _filter = f);
+    setState(() {
+      _filter = f;
+      if (f == _RecFilter.byDay) {
+        final days = _daysGrouped.keys.toList()..sort((a, b) => b.compareTo(a));
+        if (_selectedDayKey == null || !days.contains(_selectedDayKey)) {
+          _selectedDayKey = days.isEmpty ? null : days.first;
+        }
+      }
+    });
     if (f == _RecFilter.visits ||
         f == _RecFilter.documents ||
         f == _RecFilter.all) {
@@ -130,42 +140,12 @@ class _RecordsScreenState extends State<RecordsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    _chip('All', _filter == _RecFilter.all, () {
-                      _setFilter(_RecFilter.all);
-                    }),
-                    _chip('Reports', _filter == _RecFilter.reports, () {
-                      _setFilter(_RecFilter.reports);
-                    }),
-                    _chip('Visits', _filter == _RecFilter.visits, () {
-                      _setFilter(_RecFilter.visits);
-                    }),
-                    _chip('Documents', _filter == _RecFilter.documents, () {
-                      _setFilter(_RecFilter.documents);
-                    }),
-                    _chip('By day', _filter == _RecFilter.byDay, () {
-                      _setFilter(_RecFilter.byDay);
-                    }),
-                    _chip('Notes', false, () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => NotesScreen(
-                            store: widget.store,
-                            onChanged: () => setState(() {}),
-                          ),
-                        ),
-                      );
-                    }),
-                    _chip('Timeline', false, () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => TimelineScreen(store: widget.store),
-                        ),
-                      );
-                    }),
-                  ],
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _RecFilterPill(
+                    filter: _filter,
+                    onChanged: _setFilter,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Expanded(
@@ -191,7 +171,14 @@ class _RecordsScreenState extends State<RecordsScreen> {
                                       Padding(
                                         padding:
                                             const EdgeInsets.only(bottom: 8),
-                                        child: _dayCard(e.key, e.value),
+                                        child: _dayCard(
+                                          e.key,
+                                          e.value,
+                                          selected: e.key == _selectedDayKey,
+                                          onSelect: () => setState(
+                                            () => _selectedDayKey = e.key,
+                                          ),
+                                        ),
                                       ),
                                   ],
                                 ))
@@ -274,19 +261,34 @@ class _RecordsScreenState extends State<RecordsScreen> {
           ),
           const SizedBox(width: 20),
           Expanded(
-            child: selected == null
-                ? Center(
-                    child: Text(
-                      'Select a report to inspect values.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  )
-                : _ReportDetailPane(
-                    key: ValueKey(selected.id),
-                    store: widget.store,
-                    report: selected,
-                    onChanged: () => setState(() {}),
-                  ),
+            child: _filter == _RecFilter.byDay
+                ? (_selectedDayKey == null ||
+                        !_daysGrouped.containsKey(_selectedDayKey)
+                    ? Center(
+                        child: Text(
+                          'Select a day to see the complete report.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      )
+                    : _DayCompletePane(
+                        key: ValueKey(_selectedDayKey),
+                        store: widget.store,
+                        dayKey: _selectedDayKey!,
+                        reports: _daysGrouped[_selectedDayKey!]!,
+                      ))
+                : selected == null
+                    ? Center(
+                        child: Text(
+                          'Select a report to inspect values.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      )
+                    : _ReportDetailPane(
+                        key: ValueKey(selected.id),
+                        store: widget.store,
+                        report: selected,
+                        onChanged: () => setState(() {}),
+                      ),
           ),
         ],
       ),
@@ -394,42 +396,9 @@ class _RecordsScreenState extends State<RecordsScreen> {
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-            child: Wrap(
-              spacing: 8,
-              children: [
-                _chip('All', _filter == _RecFilter.all, () {
-                  _setFilter(_RecFilter.all);
-                }),
-                _chip('Reports', _filter == _RecFilter.reports, () {
-                  _setFilter(_RecFilter.reports);
-                }),
-                _chip('Visits', _filter == _RecFilter.visits, () {
-                  _setFilter(_RecFilter.visits);
-                }),
-                _chip('Documents', _filter == _RecFilter.documents, () {
-                  _setFilter(_RecFilter.documents);
-                }),
-                _chip('By day', _filter == _RecFilter.byDay, () {
-                  _setFilter(_RecFilter.byDay);
-                }),
-                _chip('Notes', false, () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => NotesScreen(
-                        store: widget.store,
-                        onChanged: () => setState(() {}),
-                      ),
-                    ),
-                  );
-                }),
-                _chip('Timeline', false, () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => TimelineScreen(store: widget.store),
-                    ),
-                  );
-                }),
-              ],
+            child: _RecFilterPill(
+              filter: _filter,
+              onChanged: _setFilter,
             ),
           ),
           const SizedBox(height: 12),
@@ -595,22 +564,41 @@ class _RecordsScreenState extends State<RecordsScreen> {
     return map;
   }
 
-  Widget _dayCard(String dayKey, List<ReportRecord> reports) {
+  Widget _dayCard(
+    String dayKey,
+    List<ReportRecord> reports, {
+    bool selected = false,
+    VoidCallback? onSelect,
+  }) {
     final label = DateFormat('d MMM yyyy').format(DateTime.parse(dayKey));
     final obsCount = widget.store.observations
         .where((o) => reports.any((r) => r.id == o.reportId))
         .length;
     return Material(
-      color: BodylineColors.surface,
+      color: selected ? BodylineColors.selectedWash : BodylineColors.surface,
       borderRadius: BorderRadius.circular(BodylineRadii.cardSmall),
       child: InkWell(
         borderRadius: BorderRadius.circular(BodylineRadii.cardSmall),
-        onTap: () => _openDayReport(dayKey, reports),
+        onTap: onSelect ??
+            () {
+              // Mobile / no detail pane: push a full-screen day report.
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => _DayCompletePage(
+                    store: widget.store,
+                    dayKey: dayKey,
+                    reports: reports,
+                  ),
+                ),
+              );
+            },
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(BodylineRadii.cardSmall),
-            border: Border.all(color: BodylineColors.border),
+            border: Border.all(
+              color: selected ? BodylineColors.teal : BodylineColors.border,
+            ),
           ),
           child: Row(
             children: [
@@ -631,52 +619,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Future<void> _openDayReport(
-    String dayKey,
-    List<ReportRecord> reports,
-  ) async {
-    final label = DateFormat('d MMM yyyy').format(DateTime.parse(dayKey));
-    final obs = widget.store.observations
-        .where((o) => reports.any((r) => r.id == o.reportId))
-        .toList()
-      ..sort((a, b) => a.parameterName.compareTo(b.parameterName));
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Complete report · $label'),
-        content: SizedBox(
-          width: 480,
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              Text(
-                'Merged from ${reports.map((r) => r.title).join(', ')}',
-                style: Theme.of(ctx).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 12),
-              for (final o in obs)
-                ListTile(
-                  dense: true,
-                  title: Text(o.parameterName),
-                  trailing: Text(
-                    '${o.valueReported} ${o.unitReported}'.trim(),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-        ],
       ),
     );
   }
@@ -758,28 +700,112 @@ class _RecordsScreenState extends State<RecordsScreen> {
     );
   }
 
-  Widget _chip(String label, bool selected, VoidCallback onTap) {
-    return Material(
-      color: selected ? BodylineColors.ink : BodylineColors.surface,
-      shape: StadiumBorder(
-        side: BorderSide(
-          color: selected ? BodylineColors.ink : BodylineColors.outlineSoft,
-        ),
+}
+
+
+class _RecFilterPill extends StatelessWidget {
+  const _RecFilterPill({
+    required this.filter,
+    required this.onChanged,
+  });
+
+  final _RecFilter filter;
+  final ValueChanged<_RecFilter> onChanged;
+
+  String get _label => switch (filter) {
+        _RecFilter.all => 'All records',
+        _RecFilter.reports => 'Reports',
+        _RecFilter.visits => 'Visits',
+        _RecFilter.documents => 'Documents',
+        _RecFilter.byDay => 'By day',
+      };
+
+  bool get _narrowed => filter != _RecFilter.all;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: PopupMenuButton<_RecFilter>(
+      tooltip: 'Filter records',
+      offset: const Offset(0, 42),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: BodylineColors.border),
       ),
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const StadiumBorder(),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: selected ? BodylineColors.onInk : BodylineColors.ink,
+      color: BodylineColors.surface,
+      initialValue: filter,
+      onSelected: onChanged,
+      itemBuilder: (context) => [
+        for (final f in _RecFilter.values)
+          PopupMenuItem(
+            value: f,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    switch (f) {
+                      _RecFilter.all => 'All records',
+                      _RecFilter.reports => 'Reports',
+                      _RecFilter.visits => 'Visits',
+                      _RecFilter.documents => 'Documents',
+                      _RecFilter.byDay => 'By day',
+                    },
+                    style: TextStyle(
+                      fontWeight:
+                          f == filter ? FontWeight.w700 : FontWeight.w500,
+                      color: BodylineColors.ink,
+                    ),
+                  ),
+                ),
+                if (f == filter)
+                  Icon(Icons.check, size: 16, color: BodylineColors.teal),
+              ],
             ),
           ),
+      ],
+      child: Material(
+        color: _narrowed ? BodylineColors.ink : BodylineColors.surface,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color:
+                _narrowed ? BodylineColors.ink : BodylineColors.outlineSoft,
+          ),
         ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.filter_list_rounded,
+                size: 16,
+                color: _narrowed
+                    ? BodylineColors.onInk
+                    : BodylineColors.inkMuted,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color:
+                      _narrowed ? BodylineColors.onInk : BodylineColors.ink,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: _narrowed
+                    ? BodylineColors.onInk
+                    : BodylineColors.inkMuted,
+              ),
+            ],
+          ),
+        ),
+      ),
       ),
     );
   }
@@ -1217,6 +1243,293 @@ class _ReportDetailPaneState extends State<_ReportDetailPane> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DayCompletePane extends StatelessWidget {
+  const _DayCompletePane({
+    super.key,
+    required this.store,
+    required this.dayKey,
+    required this.reports,
+  });
+
+  final LocalStore store;
+  final String dayKey;
+  final List<ReportRecord> reports;
+
+  Color _valueColor(ObservationRecord o) {
+    if (o.flag == ObservationFlag.high ||
+        o.flag == ObservationFlag.criticalHigh ||
+        o.flag == ObservationFlag.abnormal) {
+      return BodylineColors.orange;
+    }
+    if (o.flag == ObservationFlag.low ||
+        o.flag == ObservationFlag.criticalLow) {
+      return BodylineColors.blue;
+    }
+    return BodylineColors.ink;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final label = DateFormat('d MMM yyyy').format(DateTime.parse(dayKey));
+    final obs = store.observations
+        .where((o) => reports.any((r) => r.id == o.reportId))
+        .toList()
+      ..sort((a, b) => a.parameterName.compareTo(b.parameterName));
+    final flagged = obs
+        .where((o) => o.flag != null && o.flag != ObservationFlag.normal)
+        .toList();
+    final titles = reports.map((r) => r.title).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: BodylineColors.surface,
+        borderRadius: BorderRadius.circular(BodylineRadii.card),
+        border: Border.all(color: BodylineColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Complete report',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontSize: 24,
+                  fontFamily: 'Fraunces',
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$label · ${reports.length} package${reports.length == 1 ? '' : 's'} · ${obs.length} values',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 13),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Merged from ${titles.join(', ')}',
+            style: TextStyle(fontSize: 12, color: BodylineColors.inkSubtle),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _DayStat('Values', '${obs.length}', 'all on this day'),
+              const SizedBox(width: 10),
+              _DayStat(
+                'Flagged',
+                '${flagged.length}',
+                flagged.isEmpty
+                    ? 'none'
+                    : flagged
+                        .take(2)
+                        .map((o) => o.parameterName.split(' ').first)
+                        .join(' · '),
+                accent: flagged.isNotEmpty ? BodylineColors.orange : null,
+              ),
+              const SizedBox(width: 10),
+              _DayStat(
+                'Packages',
+                '${reports.length}',
+                titles.take(2).join(' · '),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Text(
+                'Parameter',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const Spacer(),
+              SizedBox(
+                width: 72,
+                child: Text(
+                  'Value',
+                  textAlign: TextAlign.right,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 56,
+                child: Text(
+                  'Unit',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
+              SizedBox(
+                width: 100,
+                child: Text(
+                  'Lab range',
+                  textAlign: TextAlign.right,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          Divider(color: BodylineColors.divider),
+          Expanded(
+            child: obs.isEmpty
+                ? Center(
+                    child: Text(
+                      'No values on this day.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: obs.length,
+                    separatorBuilder: (_, __) =>
+                        Divider(height: 1, color: BodylineColors.divider),
+                    itemBuilder: (context, i) {
+                      final o = obs[i];
+                      final range = (o.refLow != null || o.refHigh != null)
+                          ? '${o.refLow ?? '\u2014'}\u2013${o.refHigh ?? '\u2014'}'
+                          : '\u2014';
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                o.parameterName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 72,
+                              child: Text(
+                                o.valueReported,
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: _valueColor(o),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            SizedBox(
+                              width: 56,
+                              child: Text(
+                                o.unitReported,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                            SizedBox(
+                              width: 100,
+                              child: Text(
+                                range,
+                                textAlign: TextAlign.right,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DayStat extends StatelessWidget {
+  const _DayStat(this.label, this.value, this.sub, {this.accent});
+  final String label;
+  final String value;
+  final String sub;
+  final Color? accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: BodylineColors.chip,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: BodylineColors.inkSubtle,
+              ),
+            ),
+            const SizedBox(height: 4),
+            if (value.isNotEmpty)
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: accent ?? BodylineColors.ink,
+                ),
+              ),
+            Text(
+              sub,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                color: accent ?? BodylineColors.inkSubtle,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DayCompletePage extends StatelessWidget {
+  const _DayCompletePage({
+    required this.store,
+    required this.dayKey,
+    required this.reports,
+  });
+
+  final LocalStore store;
+  final String dayKey;
+  final List<ReportRecord> reports;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: BodylineColors.paper,
+      appBar: AppBar(
+        title: Text(
+          DateFormat('d MMM yyyy').format(DateTime.parse(dayKey)),
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: _DayCompletePane(
+          store: store,
+          dayKey: dayKey,
+          reports: reports,
         ),
       ),
     );

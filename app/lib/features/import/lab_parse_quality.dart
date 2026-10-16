@@ -1,3 +1,9 @@
+/// Lab OCR / PDF text heuristics for Vitalog import.
+///
+/// Prefer [LocalStore.parseLabFromBoxes] (WordBox → zone → tokens → evidence)
+/// when geometry is available. This file remains the text-fallback and fill-gap
+/// path until FR-014…016 coverage is solid on photos/scans.
+
 import 'package:bodyline_core/bodyline_core.dart';
 
 // Quality filters for OCR / paste lab parsing — prefer result rows over

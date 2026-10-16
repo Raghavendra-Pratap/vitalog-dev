@@ -13,7 +13,7 @@ import 'trend_screen.dart';
 import '../visits/reminder_form.dart';
 
 enum _Filter { all, flagged }
-enum _SortMode { alpha, popular, crucial }
+enum _SortMode { alpha, mostTested, lastTested }
 
 class TestsScreen extends StatefulWidget {
   const TestsScreen({
@@ -36,7 +36,7 @@ class TestsScreen extends StatefulWidget {
 class _TestsScreenState extends State<TestsScreen> {
   final _search = TextEditingController();
   _Filter _filter = _Filter.all;
-  _SortMode _sort = _SortMode.popular;
+  _SortMode _sort = _SortMode.mostTested;
   String? _selectedCode;
   Map<String, String> _systemByParam = {};
 
@@ -110,23 +110,15 @@ class _TestsScreenState extends State<TestsScreen> {
     switch (_sort) {
       case _SortMode.alpha:
         rows.sort((a, b) => a.parameterName.compareTo(b.parameterName));
-      case _SortMode.popular:
+      case _SortMode.mostTested:
         rows.sort((a, b) {
           final c = (freq[b.parameterCode] ?? 0)
               .compareTo(freq[a.parameterCode] ?? 0);
           return c != 0 ? c : a.parameterName.compareTo(b.parameterName);
         });
-      case _SortMode.crucial:
-        int rank(ObservationRecord o) {
-          if (o.flag == null || o.flag == ObservationFlag.normal) return 2;
-          if (o.flag == ObservationFlag.criticalHigh ||
-              o.flag == ObservationFlag.criticalLow) {
-            return 0;
-          }
-          return 1;
-        }
+      case _SortMode.lastTested:
         rows.sort((a, b) {
-          final c = rank(a).compareTo(rank(b));
+          final c = b.observedAt.compareTo(a.observedAt);
           return c != 0 ? c : a.parameterName.compareTo(b.parameterName);
         });
     }
@@ -218,6 +210,7 @@ class _TestsScreenState extends State<TestsScreen> {
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
+                  runSpacing: 8,
                   children: [
                     _chip('All', _filter == _Filter.all, () {
                       setState(() => _filter = _Filter.all);
@@ -227,15 +220,10 @@ class _TestsScreenState extends State<TestsScreen> {
                       _filter == _Filter.flagged,
                       () => setState(() => _filter = _Filter.flagged),
                     ),
-                    _chip('A–Z', _sort == _SortMode.alpha, () {
-                      setState(() => _sort = _SortMode.alpha);
-                    }),
-                    _chip('Popular', _sort == _SortMode.popular, () {
-                      setState(() => _sort = _SortMode.popular);
-                    }),
-                    _chip('Crucial', _sort == _SortMode.crucial, () {
-                      setState(() => _sort = _SortMode.crucial);
-                    }),
+                    _TestsSortPill(
+                      sort: _sort,
+                      onChanged: (s) => setState(() => _sort = s),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -541,6 +529,7 @@ class _TestsScreenState extends State<TestsScreen> {
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
             child: Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: [
                 _chip('All', _filter == _Filter.all, () {
                   setState(() => _filter = _Filter.all);
@@ -548,15 +537,10 @@ class _TestsScreenState extends State<TestsScreen> {
                 _chip('Flagged', _filter == _Filter.flagged, () {
                   setState(() => _filter = _Filter.flagged);
                 }),
-                _chip('A–Z', _sort == _SortMode.alpha, () {
-                  setState(() => _sort = _SortMode.alpha);
-                }),
-                _chip('Popular', _sort == _SortMode.popular, () {
-                  setState(() => _sort = _SortMode.popular);
-                }),
-                _chip('Crucial', _sort == _SortMode.crucial, () {
-                  setState(() => _sort = _SortMode.crucial);
-                }),
+                _TestsSortPill(
+                  sort: _sort,
+                  onChanged: (s) => setState(() => _sort = s),
+                ),
               ],
             ),
           ),
@@ -694,6 +678,108 @@ class _TestsScreenState extends State<TestsScreen> {
               fontWeight: FontWeight.w700,
               color: selected ? BodylineColors.onInk : BodylineColors.ink,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class _TestsSortPill extends StatelessWidget {
+  const _TestsSortPill({
+    required this.sort,
+    required this.onChanged,
+  });
+
+  final _SortMode sort;
+  final ValueChanged<_SortMode> onChanged;
+
+  String get _label => switch (sort) {
+        _SortMode.alpha => 'A–Z',
+        _SortMode.mostTested => 'Most tested',
+        _SortMode.lastTested => 'Last tested',
+      };
+
+  bool get _narrowed => sort != _SortMode.mostTested;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_SortMode>(
+      tooltip: 'Sort tests',
+      offset: const Offset(0, 42),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: BodylineColors.border),
+      ),
+      color: BodylineColors.surface,
+      initialValue: sort,
+      onSelected: onChanged,
+      itemBuilder: (context) => [
+        for (final s in _SortMode.values)
+          PopupMenuItem(
+            value: s,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    switch (s) {
+                      _SortMode.alpha => 'A–Z',
+                      _SortMode.mostTested => 'Most tested',
+                      _SortMode.lastTested => 'Last tested',
+                    },
+                    style: TextStyle(
+                      fontWeight:
+                          s == sort ? FontWeight.w700 : FontWeight.w500,
+                      color: BodylineColors.ink,
+                    ),
+                  ),
+                ),
+                if (s == sort)
+                  Icon(Icons.check, size: 16, color: BodylineColors.teal),
+              ],
+            ),
+          ),
+      ],
+      child: Material(
+        color: _narrowed ? BodylineColors.ink : BodylineColors.surface,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color:
+                _narrowed ? BodylineColors.ink : BodylineColors.outlineSoft,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.sort_rounded,
+                size: 16,
+                color: _narrowed
+                    ? BodylineColors.onInk
+                    : BodylineColors.inkMuted,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color:
+                      _narrowed ? BodylineColors.onInk : BodylineColors.ink,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 18,
+                color: _narrowed
+                    ? BodylineColors.onInk
+                    : BodylineColors.inkMuted,
+              ),
+            ],
           ),
         ),
       ),

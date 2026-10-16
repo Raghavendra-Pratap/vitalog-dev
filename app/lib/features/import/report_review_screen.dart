@@ -13,6 +13,7 @@ import '../../widgets/ref_range_fields.dart';
 import '../../data/ref_range_suggestions.dart';
 import 'ocr_layout.dart';
 import 'ocr_normalize.dart';
+import 'package:bodyline_core/bodyline_core.dart';
 import 'pdf_text.dart';
 
 /// PDF / paste review: preview extract, confirm catalogue matches, save panel.
@@ -105,6 +106,9 @@ class _ReportReviewScreenState extends State<ReportReviewScreen> {
   String? _sourcePdfPath;
   List<int>? _sourcePdfBytes;
   String? _sourcePdfName;
+  /// Catalogue panel order for review + save (code → name + rows).
+  List<({String panelCode, String panelName, List<_EditableMatch> rows})>
+      _panelGroups = [];
 
   @override
   void initState() {
@@ -135,6 +139,33 @@ class _ReportReviewScreenState extends State<ReportReviewScreen> {
   int get _includedCount =>
       _rows.where((r) => r.included && r.value.text.trim().isNotEmpty).length;
 
+  /// Flattened panel headers + rows for the match list (respects page filter).
+  List<Object> get _matchedListEntries {
+    final filter = _pageFilter;
+    final out = <Object>[];
+    final groups = _panelGroups.isNotEmpty
+        ? _panelGroups
+        : [
+            (
+              panelCode: 'all',
+              panelName: 'Matched tests',
+              rows: _rows,
+            ),
+          ];
+    for (final g in groups) {
+      final rows = [
+        for (final r in g.rows)
+          if (filter == null || r.pageIndex == filter) r,
+      ];
+      if (rows.isEmpty) continue;
+      final included = rows.where((r) => r.included).length;
+      out.add('${g.panelName} · $included of ${rows.length}');
+      out.addAll(rows);
+    }
+    return out;
+  }
+
+
   Future<void> _pickPdf() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -159,12 +190,13 @@ class _ReportReviewScreenState extends State<ReportReviewScreen> {
       _note = 'Reading PDF text…';
     });
     try {
-      final text = await extractPdfTextInteractive(
+      final extracted = await extractPdfResultInteractive(
         context,
         path: path,
         bytes: bytes,
       );
       if (!mounted) return;
+      final text = extracted?.text;
       if (text == null || text.trim().isEmpty) {
         final encrypted = await pdfLooksEncrypted(path, bytes: bytes);
         setState(() {
@@ -188,7 +220,7 @@ class _ReportReviewScreenState extends State<ReportReviewScreen> {
         _busy = false;
         _note = 'PDF text extracted on-device. Review matches before saving.';
       });
-      await _parse(text);
+      await _parse(text, boxes: extracted?.boxes);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -198,18 +230,35 @@ class _ReportReviewScreenState extends State<ReportReviewScreen> {
     }
   }
 
-  Future<void> _parse(String text) async {
+  Future<void> _parse(String text, {List<WordBox>? boxes}) async {
     setState(() => _busy = true);
-    final rows = await widget.store.parseLabText(normalizeOcrLabText(text), bandsSource: text);
+    final rows = (boxes != null && boxes.length >= 4)
+        ? await widget.store.parseLabFromBoxes(
+            boxes,
+            bandsSource: text,
+            textFallback: text,
+          )
+        : await widget.store.parseLabText(normalizeOcrLabText(text), bandsSource: text);
     if (!mounted) return;
     for (final r in _rows) {
       r.dispose();
     }
+    final ordered = [...rows]..sort((a, b) {
+      int rank(String? o) => switch (o) {
+            'review' => 0,
+            'unrecognised' => 1,
+            'autoAccept' => 2,
+            _ => 1,
+          };
+      final c = rank(a.extractionOutcome).compareTo(rank(b.extractionOutcome));
+      if (c != 0) return c;
+      return (b.evidenceScore ?? 0).compareTo(a.evidenceScore ?? 0);
+    });
     setState(() {
       _rawPreview = text;
       final pid = widget.store.activeProfileId;
       _rows = [
-        for (final r in rows)
+        for (final r in ordered)
           _EditableMatch(
             r,
             suggestions: pid == null
@@ -249,69 +298,142 @@ class _ReportReviewScreenState extends State<ReportReviewScreen> {
             .map((e) => 'p${e.key}:${e.value}')
             .join(' · ');
         _note =
-            '$pages page(s) · ${rows.length} matches ($spread)$dateBit. Edit values per page, then save all.';
+            '$pages page(s) · ${rows.length} matches ($spread)$dateBit. Review by panel, then save.';
       }
     });
+    await _rebuildPanelGroups();
+  }
+
+  Future<void> _rebuildPanelGroups() async {
+    if (_rows.isEmpty) {
+      if (mounted) setState(() => _panelGroups = []);
+      return;
+    }
+    final meta = await widget.store.groupParameterCodesByPanel(
+      _rows.map((r) => r.parameterCode),
+    );
+    final codeToPanel = <String, ({String panelCode, String panelName})>{};
+    for (final g in meta) {
+      for (final c in g.parameterCodes) {
+        codeToPanel[c] = (panelCode: g.panelCode, panelName: g.panelName);
+      }
+    }
+    final buckets = <String, List<_EditableMatch>>{
+      for (final g in meta) g.panelCode: <_EditableMatch>[],
+    };
+    final names = <String, String>{
+      for (final g in meta) g.panelCode: g.panelName,
+    };
+    for (final r in _rows) {
+      final pan = codeToPanel[r.parameterCode];
+      if (pan == null) continue;
+      buckets[pan.panelCode]!.add(r);
+    }
+    final groups = <
+        ({String panelCode, String panelName, List<_EditableMatch> rows})>[];
+    for (final g in meta) {
+      final rows = buckets[g.panelCode] ?? const <_EditableMatch>[];
+      if (rows.isEmpty) continue;
+      groups.add((
+        panelCode: g.panelCode,
+        panelName: names[g.panelCode] ?? g.panelName,
+        rows: rows,
+      ));
+    }
+    if (!mounted) return;
+    setState(() => _panelGroups = groups);
   }
 
   Future<void> _save() async {
     final pid = widget.store.activeProfileId;
     if (pid == null) return;
-    // First included wins when the same parameter appears on multiple pages.
-    final seen = <String>{};
-    final values = <ManualObservationInput>[];
-    for (final p in _rows) {
-      if (!p.included) continue;
-      final v = p.value.text.trim();
-      if (v.isEmpty) continue;
-      if (!seen.add(p.parameterCode)) continue;
-      values.add(
-        ManualObservationInput(
-          parameterCode: p.parameterCode,
-          parameterName: p.parameterName,
-          valueReported: v,
-          unitReported: p.unit.text.trim(),
-          refLow: p.refs.snapshot().low,
-          refHigh: p.refs.snapshot().high,
-          refBands: p.refs.snapshot().bands,
+    try {
+      if (_panelGroups.isEmpty) await _rebuildPanelGroups();
+      final collected = _collectedAt ?? DateTime.now();
+      final custom = _title.text.trim();
+      final useCustom = custom.isNotEmpty &&
+          custom.toLowerCase() != 'imported report';
+
+      final seen = <String>{};
+      ReportRecord? firstReport;
+      var savedPanels = 0;
+
+      for (final g in _panelGroups) {
+        final values = <ManualObservationInput>[];
+        for (final p in g.rows) {
+          if (!p.included) continue;
+          final v = p.value.text.trim();
+          if (v.isEmpty) continue;
+          if (!seen.add(p.parameterCode)) continue;
+          values.add(
+            ManualObservationInput(
+              parameterCode: p.parameterCode,
+              parameterName: p.parameterName,
+              valueReported: v,
+              unitReported: p.unit.text.trim(),
+              refLow: p.refs.snapshot().low,
+              refHigh: p.refs.snapshot().high,
+              refBands: p.refs.snapshot().bands,
+            ),
+          );
+        }
+        if (values.isEmpty) continue;
+        final title = useCustom ? '$custom · ${g.panelName}' : g.panelName;
+        final report = await widget.store.addManualPanel(
+          profileId: pid,
+          title: title,
+          collectedAt: collected,
+          values: values,
+          source: 'import',
+        );
+        if (report == null) continue;
+        firstReport ??= report;
+        savedPanels++;
+      }
+      if (firstReport == null || savedPanels == 0) return;
+
+      // Attach the PDF once, on the first panel report.
+      try {
+        final name = _sourcePdfName ?? 'lab-report.pdf';
+        if (_sourcePdfPath != null && _sourcePdfPath!.isNotEmpty) {
+          await widget.store.addAttachment(
+            ownerType: 'report',
+            ownerId: firstReport.id,
+            filePath: _sourcePdfPath!,
+            mime: 'application/pdf',
+            fileName: name,
+          );
+        } else if (_sourcePdfBytes != null && _sourcePdfBytes!.isNotEmpty) {
+          await widget.store.addAttachmentBytes(
+            ownerType: 'report',
+            ownerId: firstReport.id,
+            bytes: _sourcePdfBytes!,
+            mime: 'application/pdf',
+            fileName: name,
+          );
+        }
+      } catch (_) {
+        // Values already saved; original can be attached later from Records.
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            savedPanels == 1
+                ? 'Saved 1 panel'
+                : 'Saved $savedPanels panels',
+          ),
         ),
       );
-    }
-    if (values.isEmpty) return;
-    final report = await widget.store.addManualPanel(
-      profileId: pid,
-      title: _title.text.trim().isEmpty ? 'Imported report' : _title.text.trim(),
-      collectedAt: _collectedAt ?? DateTime.now(),
-      values: values,
-      source: 'import',
-    );
-    if (report == null) return;
-    // Keep the imported PDF as the encrypted original on this report.
-    try {
-      final name = _sourcePdfName ?? 'lab-report.pdf';
-      if (_sourcePdfPath != null && _sourcePdfPath!.isNotEmpty) {
-        await widget.store.addAttachment(
-          ownerType: 'report',
-          ownerId: report.id,
-          filePath: _sourcePdfPath!,
-          mime: 'application/pdf',
-          fileName: name,
-        );
-      } else if (_sourcePdfBytes != null && _sourcePdfBytes!.isNotEmpty) {
-        await widget.store.addAttachmentBytes(
-          ownerType: 'report',
-          ownerId: report.id,
-          bytes: _sourcePdfBytes!,
-          mime: 'application/pdf',
-          fileName: name,
+      widget.onSaved();
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not save panels: $e')),
         );
       }
-    } catch (_) {
-      // Values already saved; original can be attached later from Records.
     }
-    if (!mounted) return;
-    widget.onSaved();
-    Navigator.of(context).pop();
   }
 
   ProfileRecord? get _profile {
@@ -458,7 +580,9 @@ class _ReportReviewScreenState extends State<ReportReviewScreen> {
                   child: Text(
                     _includedCount == 0
                         ? 'Save values'
-                        : 'Save all ($_includedCount)',
+                        : (_panelGroups.length <= 1
+                            ? 'Save panel ($_includedCount)'
+                            : 'Save ${_panelGroups.length} panels'),
                   ),
                 ),
               ],
@@ -841,7 +965,9 @@ class _ReportReviewScreenState extends State<ReportReviewScreen> {
           Row(
             children: [
               Text(
-                '$included to save',
+                _panelGroups.length > 1
+                    ? '$included to save · ${_panelGroups.length} panels'
+                    : '$included to save',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: BodylineColors.tealDark,
@@ -938,30 +1064,27 @@ class _ReportReviewScreenState extends State<ReportReviewScreen> {
                         ),
                       )
                     : ListView.builder(
-                        itemCount: visible.length,
+                        itemCount: _matchedListEntries.length,
                         itemBuilder: (context, i) {
-                          final r = visible[i];
-                          final showPageHeader = i == 0 ||
-                              visible[i - 1].pageIndex != r.pageIndex;
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              if (showPageHeader && _pageFilter == null)
-                                Padding(
-                                  padding: EdgeInsets.only(
-                                    top: i == 0 ? 0 : 12,
-                                    bottom: 6,
-                                  ),
-                                  child: Text(
-                                    'Page ${r.pageIndex}',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: BodylineColors.tealDark,
-                                    ),
-                                  ),
+                          final entry = _matchedListEntries[i];
+                          if (entry is String) {
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                top: i == 0 ? 4 : 16,
+                                bottom: 8,
+                              ),
+                              child: Text(
+                                entry,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: BodylineColors.tealDark,
                                 ),
-                              Padding(
+                              ),
+                            );
+                          }
+                          final r = entry as _EditableMatch;
+                          return Padding(
                                 padding: const EdgeInsets.only(bottom: 6),
                                 child: Opacity(
                                   opacity: r.included ? 1 : 0.45,
@@ -1084,8 +1207,6 @@ class _ReportReviewScreenState extends State<ReportReviewScreen> {
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
                           );
                         },
                       ),

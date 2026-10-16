@@ -152,6 +152,18 @@ CREATE TABLE IF NOT EXISTS medication_log (
     if (!hasForm) {
       await db.execute('ALTER TABLE medication ADD COLUMN dosage_form TEXT');
     }
+
+    final schedCols = await db.rawQuery('PRAGMA table_info(medication_schedule)');
+    if (!schedCols.any((c) => c['name'] == 'days_mask')) {
+      await db.execute(
+        "ALTER TABLE medication_schedule ADD COLUMN days_mask TEXT NOT NULL DEFAULT '1111111'",
+      );
+    }
+    if (!schedCols.any((c) => c['name'] == 'interval_days')) {
+      await db.execute(
+        'ALTER TABLE medication_schedule ADD COLUMN interval_days INTEGER',
+      );
+    }
     final logCols = await db.rawQuery('PRAGMA table_info(medication_log)');
     if (!logCols.any((c) => c['name'] == 'acted_by_profile_id')) {
       await db.execute(
@@ -388,6 +400,8 @@ CREATE TABLE IF NOT EXISTS medication_log (
     int? pillCount,
     String? restockOn,
     String? prescribedAs,
+    String? dosageForm,
+    String? endDate,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     final id = uuid.v4();
@@ -403,8 +417,9 @@ CREATE TABLE IF NOT EXISTS medication_log (
       'pill_count': pillCount,
       'restock_on': restockOn,
       'prescribed_as': prescribedAs,
+      'dosage_form': dosageForm,
       'start_date': null,
-      'end_date': null,
+      'end_date': endDate,
       'created_at': now,
       'updated_at': now,
       'hlc': '$now-0-local',
@@ -717,26 +732,110 @@ CREATE TABLE IF NOT EXISTS medication_log (
   }
 
 
+
+  /// Supports legacy `["08:00"]` and `{hm, amount}` objects.
+  static List<({String hm, double amount})> parseMedTimeSlots(Object? rawJson) {
+    try {
+      final decoded = rawJson is String ? jsonDecode(rawJson) : rawJson;
+      if (decoded is! List) return const [];
+      final out = <({String hm, double amount})>[];
+      for (final e in decoded) {
+        if (e is Map) {
+          final hm = '${e['hm'] ?? e['time'] ?? ''}'.trim();
+          if (hm.isEmpty) continue;
+          final a = e['amount'];
+          final amount = a is num
+              ? a.toDouble()
+              : double.tryParse('$a') ?? 1.0;
+          out.add((hm: hm, amount: amount <= 0 ? 1.0 : amount));
+        } else {
+          final hm = '$e'.trim();
+          if (hm.isEmpty || !hm.contains(':')) continue;
+          out.add((hm: hm, amount: 1.0));
+        }
+      }
+      return out;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static List<String> medTimeHms(Object? rawJson) => [
+        for (final s in parseMedTimeSlots(rawJson)) s.hm,
+      ];
+
+  /// Day scheduled? [daysMask] Mon=0 … Sun=6; or every [intervalDays] from [startDay].
+  static bool medicationDayIsScheduled({
+    required DateTime day,
+    String daysMask = '1111111',
+    int? intervalDays,
+    DateTime? startDay,
+  }) {
+    final d = DateTime(day.year, day.month, day.day);
+    if (intervalDays != null && intervalDays > 1) {
+      final start = startDay == null
+          ? d
+          : DateTime(startDay.year, startDay.month, startDay.day);
+      final diff = d.difference(start).inDays;
+      if (diff < 0) return false;
+      return diff % intervalDays == 0;
+    }
+    final m = daysMask.padRight(7, '0');
+    final i = d.weekday - 1;
+    return i >= 0 && i < m.length && m[i] == '1';
+  }
+
   Future<void> addMedicationSchedule({
     required String medicationId,
     required List<String> times,
     String rrule = 'FREQ=DAILY',
     double? doseAmount,
     String? doseUnit,
+    String daysMask = '1111111',
+    int? intervalDays,
+    List<({String hm, double amount})>? slots,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
+    final payload = slots != null && slots.isNotEmpty
+        ? [
+            for (final s in slots) {'hm': s.hm, 'amount': s.amount},
+          ]
+        : times;
     await userDb.insert('medication_schedule', {
       'id': uuid.v4(),
       'medication_id': medicationId,
       'rrule': rrule,
-      'times_json': jsonEncode(times),
+      'times_json': jsonEncode(payload),
       'dose_amount': doseAmount,
       'dose_unit': doseUnit,
+      'days_mask': daysMask,
+      'interval_days': intervalDays,
       'created_at': now,
       'updated_at': now,
       'hlc': '$now-0-local',
       'deleted': 0,
     });
+  }
+
+  Future<void> softDeleteMedicationSchedules(String medicationId) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await userDb.update(
+      'medication_schedule',
+      {'deleted': 1, 'updated_at': now, 'hlc': '$now-0-local'},
+      where: 'medication_id = ? AND deleted = 0',
+      whereArgs: [medicationId],
+    );
+  }
+
+  Future<Map<String, Object?>?> primaryMedicationSchedule(String medicationId) async {
+    final rows = await userDb.query(
+      'medication_schedule',
+      where: 'medication_id = ? AND deleted = 0',
+      whereArgs: [medicationId],
+      orderBy: 'created_at DESC',
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
   }
 
   Future<List<MedicalItem>> listMedicationSchedules(String medicationId) async {
@@ -822,15 +921,7 @@ WHERE s.deleted = 0 AND m.deleted = 0 AND m.end_date IS NULL
 ''');
     final out = <MedicationScheduleInfo>[];
     for (final r in rows) {
-      List<String> times = const [];
-      try {
-        final decoded = jsonDecode(r['times_json'] as String? ?? '[]');
-        if (decoded is List) {
-          times = [for (final e in decoded) '$e'.trim()]
-              .where((e) => e.isNotEmpty)
-              .toList();
-        }
-      } catch (_) {}
+      final times = medTimeHms(r['times_json']);
       if (times.isEmpty) continue;
       out.add(
         MedicationScheduleInfo(
@@ -850,7 +941,8 @@ WHERE s.deleted = 0 AND m.deleted = 0 AND m.end_date IS NULL
     final now = DateTime.now();
     final day = DateTime(now.year, now.month, now.day);
     final schedules = await userDb.rawQuery('''
-SELECT s.medication_id, s.times_json, m.name, m.kind, m.strength
+SELECT s.medication_id, s.times_json, s.days_mask, s.interval_days,
+       m.name, m.kind, m.strength, m.created_at, m.end_date
 FROM medication_schedule s
 JOIN medication m ON m.id = s.medication_id
 WHERE m.profile_id = ? AND s.deleted = 0 AND m.deleted = 0
@@ -878,16 +970,27 @@ WHERE m.profile_id = ? AND s.deleted = 0 AND m.deleted = 0
 
     final out = <MedicationDoseSlot>[];
     for (final r in schedules) {
-      List<String> times = const [];
-      try {
-        final decoded = jsonDecode(r['times_json'] as String? ?? '[]');
-        if (decoded is List) {
-          times = [for (final e in decoded) '$e'.trim()]
-              .where((e) => e.isNotEmpty)
-              .toList();
-        }
-      } catch (_) {}
+      final times = medTimeHms(r['times_json']);
       final mid = r['medication_id']! as String;
+      DateTime? startDay;
+      final createdMs = r['created_at'];
+      if (createdMs is int) {
+        final c = DateTime.fromMillisecondsSinceEpoch(createdMs);
+        startDay = DateTime(c.year, c.month, c.day);
+      } else if (createdMs is num) {
+        final c = DateTime.fromMillisecondsSinceEpoch(createdMs.toInt());
+        startDay = DateTime(c.year, c.month, c.day);
+      }
+      final interval = r['interval_days'] as int?;
+      final mask = (r['days_mask'] as String?) ?? '1111111';
+      if (!medicationDayIsScheduled(
+        day: day,
+        daysMask: mask,
+        intervalDays: interval,
+        startDay: startDay,
+      )) {
+        continue;
+      }
       for (final hm in times) {
         final parts = hm.split(':');
         if (parts.length < 2) continue;
@@ -914,6 +1017,267 @@ WHERE m.profile_id = ? AND s.deleted = 0 AND m.deleted = 0
     return out;
   }
 
+
+
+  /// Per medication × calendar day: `done` | `partial` | `none` over the last [days].
+  Future<Map<String, Map<String, String>>> medicationDayStatesLastDays(
+    String profileId, {
+    int days = 7,
+  }) async {
+    final end = DateTime.now();
+    final startDay = DateTime(end.year, end.month, end.day)
+        .subtract(Duration(days: days - 1));
+    final schedules = await userDb.rawQuery(
+      'SELECT s.medication_id, s.times_json, m.name '
+      'FROM medication_schedule s '
+      'JOIN medication m ON m.id = s.medication_id '
+      'WHERE m.profile_id = ? AND s.deleted = 0 AND m.deleted = 0 '
+      'AND m.end_date IS NULL',
+      [profileId],
+    );
+    final slotsByMed = <String, int>{};
+    for (final r in schedules) {
+      final mid = r['medication_id']! as String;
+      final n = parseMedTimeSlots(r['times_json']).length;
+      if (n > 0) slotsByMed[mid] = (slotsByMed[mid] ?? 0) + n;
+    }
+    final logs = await userDb.query(
+      'medication_log',
+      where: 'deleted = 0 AND scheduled_for >= ? AND scheduled_for < ?',
+      whereArgs: [
+        startDay.millisecondsSinceEpoch,
+        DateTime(end.year, end.month, end.day)
+            .add(const Duration(days: 1))
+            .millisecondsSinceEpoch,
+      ],
+    );
+    final takenByMedDay = <String, Map<String, int>>{};
+    for (final l in logs) {
+      if ((l['status'] as String?) != 'taken') continue;
+      final mid = l['medication_id']! as String;
+      if (!slotsByMed.containsKey(mid)) continue;
+      final when = DateTime.fromMillisecondsSinceEpoch(
+        l['scheduled_for']! as int,
+      );
+      final ymd =
+          '${when.year.toString().padLeft(4, '0')}-'
+          '${when.month.toString().padLeft(2, '0')}-'
+          '${when.day.toString().padLeft(2, '0')}';
+      final byDay = takenByMedDay.putIfAbsent(mid, () => {});
+      byDay[ymd] = (byDay[ymd] ?? 0) + 1;
+    }
+    final out = <String, Map<String, String>>{};
+    for (final e in slotsByMed.entries) {
+      final mid = e.key;
+      final need = e.value;
+      final byDay = <String, String>{};
+      for (var i = 0; i < days; i++) {
+        final d = startDay.add(Duration(days: i));
+        final ymd =
+            '${d.year.toString().padLeft(4, '0')}-'
+            '${d.month.toString().padLeft(2, '0')}-'
+            '${d.day.toString().padLeft(2, '0')}';
+        final got = takenByMedDay[mid]?[ymd] ?? 0;
+        if (got >= need && need > 0) {
+          byDay[ymd] = 'done';
+        } else if (got > 0) {
+          byDay[ymd] = 'partial';
+        } else {
+          byDay[ymd] = 'none';
+        }
+      }
+      out[mid] = byDay;
+    }
+    return out;
+  }
+
+  /// Active medication id → name.
+  Future<Map<String, String>> activeMedicationNames(String profileId) async {
+    final rows = await userDb.query(
+      'medication',
+      columns: ['id', 'name'],
+      where: 'profile_id = ? AND deleted = 0 AND end_date IS NULL',
+      whereArgs: [profileId],
+    );
+    return {
+      for (final r in rows) r['id']! as String: r['name']! as String,
+    };
+  }
+
+  /// Taken / skipped dose counts in the last [days] for a profile.
+  Future<({int taken, int skipped})> countDoseOutcomesLastDays(
+    String profileId, {
+    int days = 30,
+  }) async {
+    final end = DateTime.now();
+    final start = end.subtract(Duration(days: days));
+    final rows = await userDb.rawQuery(
+      "SELECT l.status, COUNT(*) AS c "
+      "FROM medication_log l "
+      "JOIN medication m ON m.id = l.medication_id "
+      "WHERE m.profile_id = ? AND l.deleted = 0 AND m.deleted = 0 "
+      "AND l.acted_at >= ? AND l.acted_at <= ? "
+      "GROUP BY l.status",
+      [profileId, start.millisecondsSinceEpoch, end.millisecondsSinceEpoch],
+    );
+    var taken = 0;
+    var skipped = 0;
+    for (final r in rows) {
+      final st = r['status'] as String? ?? '';
+      final c = (r['c'] as int?) ?? 0;
+      if (st == 'taken') taken = c;
+      if (st == 'skipped') skipped = c;
+    }
+    return (taken: taken, skipped: skipped);
+  }
+
+  /// Per-medication taken count in last [days].
+  Future<Map<String, int>> takenCountsLastDays(
+    String profileId, {
+    int days = 30,
+  }) async {
+    final end = DateTime.now();
+    final start = end.subtract(Duration(days: days));
+    final rows = await userDb.rawQuery(
+      "SELECT l.medication_id AS mid, COUNT(*) AS c "
+      "FROM medication_log l "
+      "JOIN medication m ON m.id = l.medication_id "
+      "WHERE m.profile_id = ? AND l.deleted = 0 AND m.deleted = 0 "
+      "AND l.status = 'taken' "
+      "AND l.acted_at >= ? AND l.acted_at <= ? "
+      "GROUP BY l.medication_id",
+      [profileId, start.millisecondsSinceEpoch, end.millisecondsSinceEpoch],
+    );
+    return {
+      for (final r in rows) r['mid']! as String: (r['c'] as int?) ?? 0,
+    };
+  }
+
+
+  /// One medicine × one calendar month.
+  /// States: `done` | `partial` | `skipped` | `none` | `off` | `future`.
+  /// `off` = not supposed to take that day (no schedule, before start, after end).
+  Future<Map<String, String>> medicationMonthDayStates({
+    required String medicationId,
+    required DateTime month,
+  }) async {
+    final medRows = await userDb.query(
+      'medication',
+      where: 'id = ? AND deleted = 0',
+      whereArgs: [medicationId],
+      limit: 1,
+    );
+    if (medRows.isEmpty) return {};
+    final med = medRows.first;
+    final endYmd = (med['end_date'] as String?)?.trim();
+    DateTime? endDay;
+    if (endYmd != null && endYmd.isNotEmpty) {
+      endDay = DateTime.tryParse(endYmd);
+      if (endDay != null) {
+        endDay = DateTime(endDay.year, endDay.month, endDay.day);
+      }
+    }
+    final createdMs = med['created_at'];
+    DateTime? startDay;
+    if (createdMs is int) {
+      final c = DateTime.fromMillisecondsSinceEpoch(createdMs);
+      startDay = DateTime(c.year, c.month, c.day);
+    } else if (createdMs is num) {
+      final c = DateTime.fromMillisecondsSinceEpoch(createdMs.toInt());
+      startDay = DateTime(c.year, c.month, c.day);
+    }
+
+    final schedules = await userDb.query(
+      'medication_schedule',
+      where: 'medication_id = ? AND deleted = 0',
+      whereArgs: [medicationId],
+    );
+    var slotsNeeded = 0;
+    var daysMask = '1111111';
+    int? intervalDays;
+    for (final s in schedules) {
+      slotsNeeded += parseMedTimeSlots(s['times_json']).length;
+      daysMask = (s['days_mask'] as String?) ?? daysMask;
+      final iv = s['interval_days'];
+      if (iv is int) {
+        intervalDays = iv;
+      } else if (iv is num) {
+        intervalDays = iv.toInt();
+      }
+    }
+
+    final monthStart = DateTime(month.year, month.month, 1);
+    final monthEnd = DateTime(month.year, month.month + 1, 0);
+    final rangeEnd = monthEnd.add(const Duration(days: 1));
+    final logs = await userDb.query(
+      'medication_log',
+      where:
+          'medication_id = ? AND deleted = 0 AND scheduled_for >= ? AND scheduled_for < ?',
+      whereArgs: [
+        medicationId,
+        monthStart.millisecondsSinceEpoch,
+        rangeEnd.millisecondsSinceEpoch,
+      ],
+    );
+    final takenByDay = <String, int>{};
+    final skippedByDay = <String, int>{};
+    for (final l in logs) {
+      final when = DateTime.fromMillisecondsSinceEpoch(
+        l['scheduled_for']! as int,
+      );
+      final ymd =
+          '${when.year.toString().padLeft(4, '0')}-'
+          '${when.month.toString().padLeft(2, '0')}-'
+          '${when.day.toString().padLeft(2, '0')}';
+      final st = l['status'] as String? ?? '';
+      if (st == 'taken') {
+        takenByDay[ymd] = (takenByDay[ymd] ?? 0) + 1;
+      } else if (st == 'skipped') {
+        skippedByDay[ymd] = (skippedByDay[ymd] ?? 0) + 1;
+      }
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final out = <String, String>{};
+    final daysInMonth = monthEnd.day;
+    for (var d = 1; d <= daysInMonth; d++) {
+      final day = DateTime(month.year, month.month, d);
+      final ymd =
+          '${day.year.toString().padLeft(4, '0')}-'
+          '${day.month.toString().padLeft(2, '0')}-'
+          '${day.day.toString().padLeft(2, '0')}';
+      final beforeStart = startDay != null && day.isBefore(startDay);
+      final afterEnd = endDay != null && day.isAfter(endDay);
+      final noSchedule = slotsNeeded <= 0;
+      final notOnFreq = !medicationDayIsScheduled(
+        day: day,
+        daysMask: daysMask,
+        intervalDays: intervalDays,
+        startDay: startDay,
+      );
+      if (beforeStart || afterEnd || noSchedule || notOnFreq) {
+        out[ymd] = 'off';
+        continue;
+      }
+      if (day.isAfter(today)) {
+        out[ymd] = 'future';
+        continue;
+      }
+      final taken = takenByDay[ymd] ?? 0;
+      final skipped = skippedByDay[ymd] ?? 0;
+      if (taken >= slotsNeeded) {
+        out[ymd] = 'done';
+      } else if (taken > 0) {
+        out[ymd] = 'partial';
+      } else if (skipped > 0) {
+        out[ymd] = 'skipped';
+      } else {
+        out[ymd] = 'none';
+      }
+    }
+    return out;
+  }
 
   Future<void> deleteAllUserData() async {
     final db = userDb;

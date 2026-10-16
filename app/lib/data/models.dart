@@ -8,6 +8,7 @@ class ProfileRecord {
     this.sex,
     this.dob,
     this.bloodGroup,
+    this.heightCm,
   });
 
   final String id;
@@ -16,6 +17,8 @@ class ProfileRecord {
   final String? sex;
   final String? dob;
   final String? bloodGroup;
+  /// Standing height in centimetres (optional; used for BMI on Health profile).
+  final double? heightCm;
 
   ProfileRecord copyWith({
     String? name,
@@ -23,9 +26,11 @@ class ProfileRecord {
     String? sex,
     String? dob,
     String? bloodGroup,
+    double? heightCm,
     bool clearSex = false,
     bool clearDob = false,
     bool clearBloodGroup = false,
+    bool clearHeightCm = false,
   }) =>
       ProfileRecord(
         id: id,
@@ -35,6 +40,7 @@ class ProfileRecord {
         dob: clearDob ? null : (dob ?? this.dob),
         bloodGroup:
             clearBloodGroup ? null : (bloodGroup ?? this.bloodGroup),
+        heightCm: clearHeightCm ? null : (heightCm ?? this.heightCm),
       );
 
   Map<String, Object?> toRow({required int nowMs, required String hlc}) => {
@@ -44,6 +50,7 @@ class ProfileRecord {
         'sex': sex,
         'dob': dob,
         'blood_group': bloodGroup,
+        'height_cm': heightCm,
         'color': null,
         'is_primary': 0,
         'notes': null,
@@ -53,14 +60,18 @@ class ProfileRecord {
         'deleted': 0,
       };
 
-  static ProfileRecord fromRow(Map<String, Object?> row) => ProfileRecord(
-        id: row['id']! as String,
-        name: row['name']! as String,
-        relation: row['relation']! as String,
-        sex: row['sex'] as String?,
-        dob: row['dob'] as String?,
-        bloodGroup: row['blood_group'] as String?,
-      );
+  static ProfileRecord fromRow(Map<String, Object?> row) {
+    final h = row['height_cm'];
+    return ProfileRecord(
+      id: row['id']! as String,
+      name: row['name']! as String,
+      relation: row['relation']! as String,
+      sex: row['sex'] as String?,
+      dob: row['dob'] as String?,
+      bloodGroup: row['blood_group'] as String?,
+      heightCm: h is num ? h.toDouble() : null,
+    );
+  }
 }
 
 class ReportRecord {
@@ -119,6 +130,7 @@ class ObservationRecord {
     this.refHigh,
     this.refBands,
     this.flag,
+    this.source,
     this.deleted = false,
   });
 
@@ -135,6 +147,8 @@ class ObservationRecord {
   final double? refHigh;
   final List<RefBand>? refBands;
   final ObservationFlag? flag;
+  /// e.g. manual, health_connect, healthkit
+  final String? source;
   final bool deleted;
 }
 
@@ -384,6 +398,8 @@ class ParsedLabLine {
     this.refBands,
     this.sourceLine,
     this.pageIndex = 1,
+    this.evidenceScore,
+    this.extractionOutcome,
   });
   final String parameterCode;
   final String parameterName;
@@ -396,6 +412,10 @@ class ParsedLabLine {
   final String? sourceLine;
   /// 1-based PDF page where this row was found (1 if unknown / paste).
   final int pageIndex;
+  /// Evidence score from layout pipeline (−100…+100); null for text-heuristic path.
+  final int? evidenceScore;
+  /// autoAccept | review | unrecognised — null for legacy text path.
+  final String? extractionOutcome;
 
   ParsedLabLine copyWith({
     String? parameterCode,
@@ -407,6 +427,8 @@ class ParsedLabLine {
     List<RefBand>? refBands,
     String? sourceLine,
     int? pageIndex,
+    int? evidenceScore,
+    String? extractionOutcome,
     bool clearBands = false,
   }) {
     return ParsedLabLine(
@@ -419,6 +441,8 @@ class ParsedLabLine {
       refBands: clearBands ? null : (refBands ?? this.refBands),
       sourceLine: sourceLine ?? this.sourceLine,
       pageIndex: pageIndex ?? this.pageIndex,
+      evidenceScore: evidenceScore ?? this.evidenceScore,
+      extractionOutcome: extractionOutcome ?? this.extractionOutcome,
     );
   }
 }

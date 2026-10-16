@@ -1,7 +1,7 @@
 name: bodyline
 description: Local-first family lab tracker. Manual entry first.
 publish_to: "none"
-version: 0.2.3+72
+version: 0.2.6+95
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -56,6 +56,7 @@ flutter:
     - assets/catalog/catalog.db
     - assets/catalog/drugs.json
     - assets/body_map.svg
+    - assets/brand/vitalog-body-map-organs.html
     - assets/brand/bodyline-mark.svg
     - assets/brand/vitalog-mark.svg
 

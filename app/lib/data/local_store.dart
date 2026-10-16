@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:bodyline_core/bodyline_core.dart';
-import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
@@ -16,8 +15,10 @@ import 'legacy_container_migrate.dart';
 import 'secure_keys.dart';
 import 'models.dart';
 import 'ref_range_suggestions.dart';
+import 'catalog_host.dart';
 import 'panel_catalog.dart';
 import '../features/import/lab_parse_quality.dart';
+import '../features/import/ocr_normalize.dart';
 
 /// On-device persistence — SQLCipher user.db (ADR-001).
 class LocalStore with MedicalStoreMixin, BlobVaultMixin, CareStoreMixin, HabitsNotesStoreMixin {
@@ -97,13 +98,10 @@ CREATE TABLE IF NOT EXISTS attachment (
       },
     );
 
-    final catalogPath = p.join(dir.path, 'catalog.db');
-    final data = await rootBundle.load('assets/catalog/catalog.db');
-    await File(catalogPath).writeAsBytes(
-      data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
-      flush: true,
-    );
-    // Catalogue is unencrypted; empty password for SQLCipher opener.
+    await _ensureProfileHeightColumn();
+
+    // Catalogue is unencrypted; prefer hosted cache when newer than bundled.
+    final catalogPath = await CatalogHost.instance.ensureLocalCatalog();
     _catalog = await openDatabase(catalogPath, readOnly: true);
 
     await ensureMedicalTables();
@@ -116,6 +114,18 @@ CREATE TABLE IF NOT EXISTS attachment (
   Future<void> close() async {
     await _user?.close();
     await _catalog?.close();
+  }
+
+  /// Fetch hosted catalogue; swap on-device file when newer.
+  Future<CatalogUpdateResult> updateCatalogFromHost() async {
+    await _catalog?.close();
+    _catalog = null;
+    try {
+      return await CatalogHost.instance.updateFromHost();
+    } finally {
+      final catalogPath = await CatalogHost.instance.cacheFile();
+      _catalog = await openDatabase(catalogPath.path, readOnly: true);
+    }
   }
 
   Future<void> reload() async {
@@ -177,9 +187,11 @@ CREATE TABLE IF NOT EXISTS attachment (
           refHigh: (r['ref_high'] as num?)?.toDouble(),
           refBands: decodeRefBandsJson(r['ref_bands_json'] as String?),
           flag: flagFromDb(r['flag'] as String?),
+          source: r['source'] as String?,
         ),
       );
     }
+    await syncProfileHeightFromObservations();
   }
 
   Future<String?> _parameterName(
@@ -234,9 +246,11 @@ CREATE TABLE IF NOT EXISTS attachment (
     String? sex,
     String? dob,
     String? bloodGroup,
+    double? heightCm,
     bool clearSex = false,
     bool clearDob = false,
     bool clearBloodGroup = false,
+    bool clearHeightCm = false,
   }) async {
     final i = profiles.indexWhere((p) => p.id == id);
     if (i < 0) {
@@ -250,9 +264,11 @@ CREATE TABLE IF NOT EXISTS attachment (
       sex: sex,
       dob: dob,
       bloodGroup: bloodGroup,
+      heightCm: heightCm,
       clearSex: clearSex,
       clearDob: clearDob,
       clearBloodGroup: clearBloodGroup,
+      clearHeightCm: clearHeightCm,
     );
     final now = DateTime.now().millisecondsSinceEpoch;
     final hlc = '$now-0-local';
@@ -264,6 +280,7 @@ CREATE TABLE IF NOT EXISTS attachment (
         'sex': updated.sex,
         'dob': updated.dob,
         'blood_group': updated.bloodGroup,
+        'height_cm': updated.heightCm,
         'updated_at': now,
         'hlc': hlc,
       },
@@ -297,6 +314,83 @@ CREATE TABLE IF NOT EXISTS attachment (
       activeProfileId = profiles.isEmpty ? null : profiles.first.id;
     }
   }
+
+
+  /// Standing height in cm from an observation (cm / in / m).
+  static double? heightCmFromObservation(ObservationRecord o) {
+    final n = o.valueNum ?? double.tryParse(o.valueReported.trim());
+    if (n == null || n <= 0) return null;
+    final u = o.unitReported.trim().toLowerCase();
+    if (u == 'in' || u == 'inch' || u == 'inches' || u == '"') {
+      return n * 2.54;
+    }
+    if (u == 'm' || u == 'meter' || u == 'meters' || u == 'metre' || u == 'metres') {
+      return n * 100;
+    }
+    // Bare metres are rare on Indian labs; values under 3 without unit → metres.
+    if (u.isEmpty && n > 0 && n < 3) return n * 100;
+    return n; // cm (default catalog unit)
+  }
+
+  ObservationRecord? latestObservation({
+    required String profileId,
+    required String parameterCode,
+  }) {
+    final code = parameterCode.toLowerCase();
+    ObservationRecord? best;
+    for (final o in observations) {
+      if (o.profileId != profileId) continue;
+      if (o.parameterCode.toLowerCase() != code) continue;
+      if (best == null || o.observedAt.isAfter(best.observedAt)) best = o;
+    }
+    return best;
+  }
+
+  /// Keep [ProfileRecord.heightCm] aligned with the newest height observation.
+  Future<void> syncProfileHeightFromObservations([String? profileId]) async {
+    final ids = profileId == null
+        ? profiles.map((p) => p.id).toList()
+        : <String>[profileId];
+    for (final id in ids) {
+      final latest = latestObservation(profileId: id, parameterCode: 'height');
+      if (latest == null) continue;
+      final cm = heightCmFromObservation(latest);
+      if (cm == null || cm < 50 || cm > 280) continue;
+      final i = profiles.indexWhere((p) => p.id == id);
+      if (i < 0) continue;
+      final cur = profiles[i].heightCm;
+      if (cur != null && (cur - cm).abs() < 0.05) continue;
+      await updateProfile(id: id, heightCm: cm);
+    }
+  }
+
+  /// Write a single vital as a small verified panel (feeds Tests + Health profile).
+  Future<void> recordVital({
+    required String profileId,
+    required String parameterCode,
+    required String parameterName,
+    required String valueReported,
+    required String unitReported,
+    DateTime? at,
+    String title = 'Vitals',
+  }) async {
+    await addManualPanel(
+      profileId: profileId,
+      title: title,
+      collectedAt: at ?? DateTime.now(),
+      values: [
+        ManualObservationInput(
+          parameterCode: parameterCode,
+          parameterName: parameterName,
+          valueReported: valueReported,
+          unitReported: unitReported,
+          source: 'manual',
+        ),
+      ],
+      source: 'manual',
+    );
+  }
+
 
   Future<ReportRecord?> addManualPanel({
     required String profileId,
@@ -403,6 +497,7 @@ CREATE TABLE IF NOT EXISTS attachment (
     });
 
     await reload();
+    await syncProfileHeightFromObservations(profileId);
     return reports.firstWhere((r) => r.id == id);
   }
 
@@ -636,6 +731,7 @@ CREATE TABLE IF NOT EXISTS attachment (
     });
 
     await reload();
+    await syncProfileHeightFromObservations(report.profileId);
   }
 
   Future<List<Map<String, Object?>>> _activeTableRows(String table) async {
@@ -692,6 +788,11 @@ CREATE TABLE IF NOT EXISTS attachment (
       'reminders': await _activeTableRows('reminder'),
       'conditions': await _activeTableRows('condition'),
       'allergies': await _activeTableRows('allergy'),
+      'immunizations': await _activeTableRows('immunization'),
+      'procedures': await _activeTableRows('procedure_record'),
+      'family_history': await _activeTableRows('family_history'),
+      'emergency_contacts': await _activeTableRows('emergency_contact'),
+      'medication_logs': await _activeTableRows('medication_log'),
       'attachments': await _activeTableRows('attachment'),
       'blob_files': await _exportBlobFiles(),
       'habits': await _activeTableRows('habit'),
@@ -929,6 +1030,35 @@ CREATE TABLE IF NOT EXISTS attachment (
       },
     );
 
+    for (final entry in [
+      ('immunization', 'immunizations'),
+      ('procedure_record', 'procedures'),
+      ('family_history', 'family_history'),
+      ('emergency_contact', 'emergency_contacts'),
+      ('medication_log', 'medication_logs'),
+    ]) {
+      final table = entry.$1;
+      final key = entry.$2;
+      final ids = {
+        for (final r in await userDb.query(table, columns: ['id']))
+          r['id']! as String,
+      };
+      careRowsAdded += await _mergeTableById(
+        table: table,
+        raw: map[key] as List?,
+        existingIds: ids,
+        touch: (row) {
+          if (row.containsKey('profile_id')) {
+            row['profile_id'] = _mapProfileId(
+                  idMap,
+                  row['profile_id'] as String?,
+                ) ??
+                row['profile_id'];
+          }
+        },
+      );
+    }
+
     final blobFiles = Map<String, String>.from(
       (map['blob_files'] as Map?)?.map(
             (k, v) => MapEntry('$k', '$v'),
@@ -1081,21 +1211,211 @@ CREATE TABLE IF NOT EXISTS attachment (
     return rows.first['name'] as String?;
   }
 
+  /// "About this test" knowledge base (`parameter_info`), if present.
+  Future<Map<String, String?>> parameterInfo(String parameterCode) async {
+    if (_catalog == null) return const {};
+    try {
+      final rows = await _catalog!.query(
+        'parameter_info',
+        where: 'parameter_code = ? AND lang = ?',
+        whereArgs: [parameterCode.trim(), 'en'],
+        limit: 1,
+      );
+      if (rows.isEmpty) return const {};
+      final r = rows.first;
+      String? s(String k) {
+        final v = r[k] as String?;
+        if (v == null || v.trim().isEmpty) return null;
+        return v.trim();
+      }
+      return {
+        'what_it_measures': s('what_it_measures'),
+        'why_its_tested': s('why_its_tested'),
+        'before_the_test': s('before_the_test'),
+        'what_can_shift_it': s('what_can_shift_it'),
+        'above_range_general': s('above_range_general'),
+        'below_range_general': s('below_range_general'),
+        'closing_line': s('closing_line'),
+        'often_tested_with': s('often_tested_with'),
+        'reminder_default': s('reminder_default'),
+        'sources': s('sources'),
+        'review_status': s('review_status'),
+        'version': s('version'),
+      };
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// Display names for catalogue parameter codes (order preserved).
+  Future<List<String>> parameterDisplayNames(Iterable<String> codes) async {
+    if (_catalog == null) return const [];
+    final out = <String>[];
+    for (final raw in codes) {
+      final code = raw.trim();
+      if (code.isEmpty) continue;
+      try {
+        final rows = await _catalog!.query(
+          'parameter',
+          columns: ['name'],
+          where: 'code = ?',
+          whereArgs: [code],
+          limit: 1,
+        );
+        if (rows.isNotEmpty) {
+          out.add(rows.first['name']! as String);
+        } else {
+          out.add(code);
+        }
+      } catch (_) {
+        out.add(code);
+      }
+    }
+    return out;
+  }
+
+  /// Organ-page knowledge base row (`system_info`), if present.
+  Future<Map<String, String?>> systemInfo(String systemCode) async {
+    if (_catalog == null) return const {};
+    try {
+      final rows = await _catalog!.query(
+        'system_info',
+        where: 'system_code = ? AND lang = ?',
+        whereArgs: [systemCode, 'en'],
+        limit: 1,
+      );
+      if (rows.isEmpty) return const {};
+      final r = rows.first;
+      String? s(String k) {
+        final v = r[k] as String?;
+        if (v == null || v.trim().isEmpty) return null;
+        return v.trim();
+      }
+      return {
+        'name': s('name'),
+        'what_it_does': s('what_it_does'),
+        'why_its_tested': s('why_its_tested'),
+        'key_tests': s('key_tests'),
+        'good_to_know': s('good_to_know'),
+        'closing_line': s('closing_line'),
+      };
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// Catalogue body_system.covers + name for relevance tokens.
+  Future<({String? name, String? covers})> bodySystemMeta(String systemCode) async {
+    if (_catalog == null) return (name: null, covers: null);
+    final rows = await _catalog!.query(
+      'body_system',
+      columns: ['name', 'covers'],
+      where: 'code = ?',
+      whereArgs: [systemCode],
+      limit: 1,
+    );
+    if (rows.isEmpty) return (name: null, covers: null);
+    return (
+      name: rows.first['name'] as String?,
+      covers: rows.first['covers'] as String?,
+    );
+  }
+
+  /// Parameter display names for a body system (for profile relevance matching).
+  Future<List<String>> parameterNamesForSystem(String systemCode) async {
+    if (_catalog == null) return const [];
+    try {
+      final rows = await _catalog!.query(
+        'parameter',
+        columns: ['name', 'code'],
+        where: 'system_code = ?',
+        whereArgs: [systemCode],
+      );
+      return [
+        for (final r in rows) ...[
+          if ((r['name'] as String?)?.isNotEmpty == true) r['name'] as String,
+          if ((r['code'] as String?)?.isNotEmpty == true) r['code'] as String,
+        ],
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+
+  /// Catalogue v2.1+: systems ordered by name (no sort_order column).
+  Future<List<Map<String, Object?>>> _catalogBodySystems() async {
+    return _catalog!.query('body_system', orderBy: 'name ASC');
+  }
+
+  /// Build system→parameter links from `parameter.system_code` (v2.1+).
+  /// Falls back to legacy `parameter_system` join table if present.
+  Future<Map<String, List<String>>> _catalogParamsBySystem() async {
+    final bySystem = <String, List<String>>{};
+    try {
+      final params = await _catalog!.query(
+        'parameter',
+        columns: ['code', 'system_code'],
+      );
+      for (final row in params) {
+        final sc = (row['system_code'] as String?)?.trim();
+        final pc = row['code'] as String?;
+        if (sc == null || sc.isEmpty || pc == null || pc.isEmpty) continue;
+        bySystem.putIfAbsent(sc, () => []).add(pc);
+      }
+      if (bySystem.isNotEmpty) return bySystem;
+    } catch (_) {}
+    try {
+      final links = await _catalog!.query('parameter_system');
+      for (final row in links) {
+        bySystem
+            .putIfAbsent(row['system_code']! as String, () => [])
+            .add(row['parameter_code']! as String);
+      }
+    } catch (_) {}
+    return bySystem;
+  }
+
+  /// Physical limits for evidence scoring (catalogue v2.1+). Missing → null.
+  Future<({double low, double high, String unit})?> physicalLimit(
+    String parameterCode,
+  ) async {
+    if (_catalog == null) return null;
+    try {
+      final rows = await _catalog!.query(
+        'physical_limit',
+        where: 'parameter_code = ?',
+        whereArgs: [parameterCode.trim()],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      final r = rows.first;
+      return (
+        low: (r['low'] as num).toDouble(),
+        high: (r['high'] as num).toDouble(),
+        unit: r['unit']! as String,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Lab layout templates (catalogue v2.1+). Empty if table absent.
+  Future<List<Map<String, Object?>>> labTemplates() async {
+    if (_catalog == null) return const [];
+    try {
+      return await _catalog!.query('lab_template');
+    } catch (_) {
+      return const [];
+    }
+  }
+
   Future<Map<String, ObservationFlag?>> organFlags() async {
     final profileId = activeProfileId;
     if (profileId == null || _catalog == null) return {};
 
-    final systems = await _catalog!.query(
-      'body_system',
-      orderBy: 'sort_order ASC',
-    );
-    final links = await _catalog!.query('parameter_system');
-    final bySystem = <String, List<String>>{};
-    for (final row in links) {
-      final sc = row['system_code']! as String;
-      final pc = row['parameter_code']! as String;
-      bySystem.putIfAbsent(sc, () => []).add(pc);
-    }
+    final systems = await _catalogBodySystems();
+    final bySystem = await _catalogParamsBySystem();
 
     // latest observation per parameter for profile
     final latest = <String, ObservationRecord>{};
@@ -1143,22 +1463,25 @@ CREATE TABLE IF NOT EXISTS attachment (
         result[code] = null;
         continue;
       }
-      final flags = params.map((pc) => latest[pc]?.flag);
-      if (flags.every((f) => f == null) &&
-          params.every((pc) => !latest.containsKey(pc))) {
+      final hasData = params.any(latest.containsKey);
+      if (!hasData) {
         result[code] = null;
-      } else {
-        result[code] = worst(flags);
+        continue;
       }
+      // Observed with no printed range (flag null) counts as in-range for rollup —
+      // matches organ detail "N in range" chips.
+      final flags = params.map((pc) {
+        final o = latest[pc];
+        if (o == null) return null;
+        return o.flag ?? ObservationFlag.normal;
+      });
+      result[code] = worst(flags);
     }
     return result;
   }
 
   Future<List<({String code, String name})>> bodySystems() async {
-    final rows = await _catalog!.query(
-      'body_system',
-      orderBy: 'sort_order ASC',
-    );
+    final rows = await _catalogBodySystems();
     return [
       for (final r in rows)
         (code: r['code']! as String, name: r['name']! as String)
@@ -1166,15 +1489,31 @@ CREATE TABLE IF NOT EXISTS attachment (
   }
 
   Future<String?> systemForParameter(String parameterCode) async {
-    final rows = await _catalog!.query(
-      'parameter_system',
-      where: 'parameter_code = ?',
-      whereArgs: [parameterCode],
-      orderBy: 'relevance ASC',
-      limit: 1,
-    );
-    if (rows.isEmpty) return null;
-    return rows.first['system_code'] as String?;
+    try {
+      final rows = await _catalog!.query(
+        'parameter',
+        columns: ['system_code'],
+        where: 'code = ?',
+        whereArgs: [parameterCode],
+        limit: 1,
+      );
+      if (rows.isNotEmpty) {
+        final sc = rows.first['system_code'] as String?;
+        if (sc != null && sc.trim().isNotEmpty) return sc;
+      }
+    } catch (_) {}
+    try {
+      final rows = await _catalog!.query(
+        'parameter_system',
+        where: 'parameter_code = ?',
+        whereArgs: [parameterCode],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      return rows.first['system_code'] as String?;
+    } catch (_) {
+      return null;
+    }
   }
 
 
@@ -1189,13 +1528,7 @@ CREATE TABLE IF NOT EXISTS attachment (
       ];
     }
 
-    final links = await _catalog!.query('parameter_system');
-    final bySystem = <String, List<String>>{};
-    for (final row in links) {
-      bySystem
-          .putIfAbsent(row['system_code']! as String, () => [])
-          .add(row['parameter_code']! as String);
-    }
+    final bySystem = await _catalogParamsBySystem();
 
     final latest = <String, ObservationRecord>{};
     for (final o in observations) {
@@ -1229,16 +1562,19 @@ CREATE TABLE IF NOT EXISTS attachment (
       final flags = <ObservationFlag>[];
       var high = 0;
       var low = 0;
+      final hasData = params.any(latest.containsKey);
       for (final code in params) {
         final o = latest[code];
-        if (o?.flag == null) continue;
-        flags.add(o!.flag!);
-        if (o.flag == ObservationFlag.high ||
-            o.flag == ObservationFlag.criticalHigh ||
-            o.flag == ObservationFlag.abnormal) {
+        if (o == null) continue;
+        // No printed range → treat as in-range for body-panel status (same as organ detail).
+        final f = o.flag ?? ObservationFlag.normal;
+        flags.add(f);
+        if (f == ObservationFlag.high ||
+            f == ObservationFlag.criticalHigh ||
+            f == ObservationFlag.abnormal) {
           high++;
-        } else if (o.flag == ObservationFlag.low ||
-            o.flag == ObservationFlag.criticalLow) {
+        } else if (f == ObservationFlag.low ||
+            f == ObservationFlag.criticalLow) {
           low++;
         }
       }
@@ -1246,13 +1582,23 @@ CREATE TABLE IF NOT EXISTS attachment (
         OrganSummary(
           code: s.code,
           name: s.name,
-          flag: params.any(latest.containsKey) ? rollup(flags) : null,
+          flag: hasData ? rollup(flags) : null,
           highCount: high,
           lowCount: low,
         ),
       );
     }
     return out;
+  }
+
+  Future<void> _ensureProfileHeightColumn() async {
+    final cols = await userDb.rawQuery('PRAGMA table_info(profile)');
+    final names = <String>{
+      for (final c in cols) c['name']! as String,
+    };
+    if (!names.contains('height_cm')) {
+      await userDb.execute('ALTER TABLE profile ADD COLUMN height_cm REAL');
+    }
   }
 
   Future<void> _createUserSchema(Database db) async {
@@ -1264,6 +1610,7 @@ CREATE TABLE profile (
   sex TEXT,
   dob TEXT,
   blood_group TEXT,
+  height_cm REAL,
   color TEXT,
   is_primary INTEGER NOT NULL DEFAULT 0,
   notes TEXT,
@@ -1492,7 +1839,70 @@ CREATE TABLE local_device (
     );
   }
 
-    Future<List<PanelDef>> catalogPanels() async {
+    
+  /// Assign parameter codes to catalogue panels (largest overlap first).
+  /// Leftovers land in panel code `other` / name "Other tests".
+  Future<List<({String panelCode, String panelName, List<String> parameterCodes})>>
+      groupParameterCodesByPanel(Iterable<String> parameterCodes) async {
+    final codes = {
+      for (final c in parameterCodes)
+        if (c.trim().isNotEmpty) c.trim(),
+    };
+    if (codes.isEmpty) return const [];
+
+    var panels = await catalogPanels();
+    if (panels.isEmpty) panels = seededPanels;
+
+    final scored = <({PanelDef panel, int hits})>[];
+    for (final panel in panels) {
+      final hits = panel.parameters.where((x) => codes.contains(x.code)).length;
+      if (hits > 0) scored.add((panel: panel, hits: hits));
+    }
+    scored.sort((a, b) {
+      final byHits = b.hits.compareTo(a.hits);
+      if (byHits != 0) return byHits;
+      return a.panel.name.compareTo(b.panel.name);
+    });
+
+    final assigned = <String>{};
+    final out =
+        <({String panelCode, String panelName, List<String> parameterCodes})>[];
+    for (final s in scored) {
+      final bucket = <String>[];
+      for (final code in codes) {
+        if (assigned.contains(code)) continue;
+        if (s.panel.parameters.any((x) => x.code == code)) {
+          bucket.add(code);
+          assigned.add(code);
+        }
+      }
+      if (bucket.isEmpty) continue;
+      // Preserve catalogue order inside the panel.
+      bucket.sort((a, b) {
+        final ai = s.panel.parameters.indexWhere((x) => x.code == a);
+        final bi = s.panel.parameters.indexWhere((x) => x.code == b);
+        return ai.compareTo(bi);
+      });
+      out.add((
+        panelCode: s.panel.code,
+        panelName: s.panel.name,
+        parameterCodes: bucket,
+      ));
+    }
+
+    final leftovers = [for (final c in codes) if (!assigned.contains(c)) c]
+      ..sort();
+    if (leftovers.isNotEmpty) {
+      out.add((
+        panelCode: 'other',
+        panelName: 'Other tests',
+        parameterCodes: leftovers,
+      ));
+    }
+    return out;
+  }
+
+  Future<List<PanelDef>> catalogPanels() async {
     final panels = await _catalog!.query('panel', orderBy: 'name ASC');
     final out = <PanelDef>[];
     for (final row in panels) {
@@ -2093,6 +2503,137 @@ CREATE TABLE local_device (
   }
 
   /// Restore from a decrypted bodyline-export-v1 JSON string (wipes first).
+
+  /// Layout-first parse (FR-013…016): WordBox → layout → zone → tokens → match/score.
+  /// Falls back to [parseLabText] when boxes are empty/sparse or pipeline finds nothing.
+  Future<List<ParsedLabLine>> parseLabFromBoxes(
+    List<WordBox> boxes, {
+    String? bandsSource,
+    String? textFallback,
+  }) async {
+    final usable = [
+      for (final b in boxes)
+        if (b.text.trim().isNotEmpty) b,
+    ];
+    if (usable.length < 4) {
+      final raw = (textFallback ?? '').trim();
+      if (raw.isEmpty) return const [];
+      return parseLabText(normalizeOcrLabText(raw), bandsSource: bandsSource ?? raw);
+    }
+
+    final catalog = await _matchCatalog();
+    final pipeline = runExtractionPipeline(usable, catalog);
+    final fromPipeline = <ParsedLabLine>[];
+    for (final s in pipeline.scored) {
+      final code = s.best?.parameterCode;
+      if (code == null || code.isEmpty) continue;
+      if (s.outcome == ExtractionOutcome.unrecognised &&
+          (s.best?.score ?? 0) < 30) {
+        continue;
+      }
+      final name = catalog.paramNames[code] ?? s.parsed.nameRaw;
+      final value = s.parsed.valueRaw.replaceAll(RegExp(r'[<>≤≥]'), '').trim();
+      if (value.isEmpty) continue;
+      fromPipeline.add(
+        ParsedLabLine(
+          parameterCode: code,
+          parameterName: name,
+          valueReported: value,
+          unitReported: s.parsed.unitNorm ?? s.parsed.unitRaw ?? '',
+          refLow: s.parsed.refLow,
+          refHigh: s.parsed.refHigh,
+          sourceLine: s.parsed.sourceLine,
+          pageIndex: s.parsed.page,
+          evidenceScore: s.best?.score,
+          extractionOutcome: switch (s.outcome) {
+            ExtractionOutcome.autoAccept => 'autoAccept',
+            ExtractionOutcome.review => 'review',
+            ExtractionOutcome.unrecognised => 'unrecognised',
+          },
+        ),
+      );
+    }
+
+    if (fromPipeline.isNotEmpty) {
+      // Prefer pipeline hits; fill gaps via text heuristic on layout text.
+      final layoutText = layoutRowsToText(pipeline.layoutRows);
+      if (layoutText.trim().isEmpty) return fromPipeline;
+      final legacy = await parseLabText(
+        normalizeOcrLabText(layoutText),
+        bandsSource: bandsSource ?? textFallback ?? layoutText,
+      );
+      final seen = {for (final p in fromPipeline) '${p.pageIndex}::${p.parameterCode}'};
+      for (final l in legacy) {
+        final key = '${l.pageIndex}::${l.parameterCode}';
+        if (seen.contains(key)) continue;
+        fromPipeline.add(l);
+        seen.add(key);
+      }
+      return fromPipeline;
+    }
+
+    final layoutText = layoutRowsToText(pipeline.layoutRows);
+    final raw = layoutText.trim().isNotEmpty
+        ? layoutText
+        : (textFallback ?? '').trim();
+    if (raw.isEmpty) return const [];
+    return parseLabText(
+      normalizeOcrLabText(raw),
+      bandsSource: bandsSource ?? textFallback ?? raw,
+    );
+  }
+
+  Future<MatchCatalog> _matchCatalog() async {
+    final aliases = await _catalog!.query('parameter_alias');
+    final aliasToCodes = <String, List<String>>{};
+    for (final r in aliases) {
+      final a = (r['alias_norm'] as String?)?.trim() ?? '';
+      final code = (r['parameter_code'] as String?)?.trim() ?? '';
+      if (a.length < 2 || code.isEmpty) continue;
+      aliasToCodes.putIfAbsent(a, () => <String>[]).add(code);
+    }
+    final params = await _catalog!.query('parameter');
+    final names = <String, String>{};
+    final units = <String, String>{};
+    for (final r in params) {
+      final code = r['code']! as String;
+      names[code] = r['name']! as String;
+      units[code] = (r['canonical_unit'] as String?) ?? '';
+      final n = _norm(r['name']! as String);
+      if (n.length >= 2) {
+        aliasToCodes.putIfAbsent(n, () => <String>[]).add(code);
+      }
+      aliasToCodes.putIfAbsent(code, () => <String>[]).add(code);
+    }
+    final limits = <String, (double, double, String)>{};
+    try {
+      final rows = await _catalog!.query('physical_limit');
+      for (final r in rows) {
+        limits[r['parameter_code']! as String] = (
+          (r['low'] as num).toDouble(),
+          (r['high'] as num).toDouble(),
+          r['unit']! as String,
+        );
+      }
+    } catch (_) {}
+    final unitAliases = <String, String>{};
+    try {
+      final rows = await _catalog!.query('unit_alias');
+      for (final r in rows) {
+        final a = (r['alias_norm'] as String?)?.trim() ?? '';
+        final u = (r['unit_code'] as String?)?.trim() ?? '';
+        if (a.isNotEmpty && u.isNotEmpty) unitAliases[a] = u;
+      }
+    } catch (_) {}
+    return MatchCatalog(
+      aliasToCodes: aliasToCodes,
+      paramNames: names,
+      paramUnits: units,
+      physicalLimits: limits,
+      unitAliases: unitAliases,
+    );
+  }
+
   Future<void> importFromExportJson(String jsonStr) async {
     final map = jsonDecode(jsonStr) as Map<String, dynamic>;
     if (map['format'] != 'bodyline-export-v1') {

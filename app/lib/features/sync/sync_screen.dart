@@ -396,9 +396,12 @@ class _SyncScreenState extends State<SyncScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      'Refreshes in ${sync.pairingPinSecondsLeft}s · trusted devices stay paired',
-                      style: Theme.of(context).textTheme.bodySmall,
+                    ValueListenableBuilder<int>(
+                      valueListenable: sync.pinTick,
+                      builder: (context, _, __) => Text(
+                        'Refreshes in ${sync.pairingPinSecondsLeft}s · trusted devices stay paired',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ),
                   ],
                 ),

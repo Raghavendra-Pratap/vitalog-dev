@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../data/local_store.dart';
 import '../../data/models.dart';
 import '../../theme/tokens.dart';
-import 'dose_wait_controller.dart';
 
 enum TodaysDosesMode { full, masterCard, detailList }
 
@@ -39,7 +38,6 @@ class TodaysDosesPanelState extends State<TodaysDosesPanel> {
   @override
   void initState() {
     super.initState();
-    DoseWaitController.instance.addListener(_onWait);
     _load();
   }
 
@@ -47,16 +45,6 @@ class TodaysDosesPanelState extends State<TodaysDosesPanel> {
   void didUpdateWidget(covariant TodaysDosesPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     _load();
-  }
-
-  @override
-  void dispose() {
-    DoseWaitController.instance.removeListener(_onWait);
-    super.dispose();
-  }
-
-  void _onWait() {
-    if (mounted) setState(() {});
   }
 
   Future<void> reload() => _load();
@@ -155,38 +143,9 @@ class TodaysDosesPanelState extends State<TodaysDosesPanel> {
       );
     }
 
-    final showHeader = widget.mode != TodaysDosesMode.detailList;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (showHeader) ...[
-          Text(
-            "Today's doses",
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Mark taken or skipped on this device.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 8),
-        ] else ...[
-          Text(
-            "Today's doses",
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Mark taken or skipped on this device.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 12),
-        ],
-        _waitBanner(),
         if (_doses.isEmpty)
           _card(
             child: Text(
@@ -201,36 +160,41 @@ class TodaysDosesPanelState extends State<TodaysDosesPanel> {
     );
   }
 
-  Widget _waitBanner() {
-    final wait = DoseWaitController.instance;
-    if (!wait.isRunning) return const SizedBox.shrink();
-    final title = wait.mode == DoseWaitMode.countdown
-        ? DoseWaitController.formatDuration(wait.remaining ?? Duration.zero)
-        : DoseWaitController.formatDuration(wait.elapsed ?? Duration.zero);
-    final subtitle = wait.mode == DoseWaitMode.countdown
-        ? 'Wait remaining${wait.label != null ? ' · ${wait.label}' : ''}'
-        : 'Stopwatch${wait.label != null ? ' · ${wait.label}' : ''}';
+  Widget _doseTile(MedicationDoseSlot d) {
+    final status = d.logStatus;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 4),
       child: _card(
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(Icons.timer, color: BodylineColors.teal),
-            const SizedBox(width: 10),
+            Text(
+              d.timeHm,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: BodylineColors.ink,
+              ),
+            ),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 20,
-                      fontFeatures: [FontFeature.tabularFigures()],
+                    d.name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: BodylineColors.ink,
                     ),
                   ),
                   Text(
-                    subtitle,
+                    [
+                      medicationKindLabel(d.kind),
+                      if (d.strength != null && d.strength!.isNotEmpty)
+                        d.strength!,
+                    ].join(' · '),
                     style: TextStyle(
                       fontSize: 12,
                       color: BodylineColors.inkSubtle,
@@ -239,95 +203,42 @@ class TodaysDosesPanelState extends State<TodaysDosesPanel> {
                 ],
               ),
             ),
-            TextButton(
-              onPressed: () => DoseWaitController.instance.stop(),
-              child: const Text('Stop'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _doseTile(MedicationDoseSlot d) {
-    final status = d.logStatus;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: _card(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Text(
-                  d.timeHm,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                  ),
+            if (status == 'taken')
+              Text(
+                'Taken',
+                style: TextStyle(
+                  color: BodylineColors.teal,
+                  fontWeight: FontWeight.w700,
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        d.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        [
-                          medicationKindLabel(d.kind),
-                          if (d.strength != null && d.strength!.isNotEmpty)
-                            d.strength!,
-                        ].join(' · '),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: BodylineColors.inkSubtle,
-                        ),
-                      ),
-                    ],
-                  ),
+              )
+            else if (status == 'skipped')
+              Text(
+                'Skipped',
+                style: TextStyle(
+                  color: BodylineColors.inkSubtle,
+                  fontWeight: FontWeight.w600,
                 ),
-                if (status == 'taken')
-                  Text(
-                    'Taken',
-                    style: TextStyle(
-                      color: BodylineColors.teal,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  )
-                else if (status == 'skipped')
-                  Text(
-                    'Skipped',
-                    style: TextStyle(
-                      color: BodylineColors.inkSubtle,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (!d.isDone) ...[
-                  OutlinedButton(
-                    onPressed: () => _mark(d, 'skipped'),
-                    child: const Text('Skip'),
-                  ),
-                  FilledButton(
-                    onPressed: () => _mark(d, 'taken'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: BodylineColors.teal,
-                    ),
-                    child: const Text('Taken'),
-                  ),
-                ],
-
-              ],
-            ),
+              )
+            else ...[
+              OutlinedButton(
+                onPressed: () => _mark(d, 'skipped'),
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: const Text('Skip'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: () => _mark(d, 'taken'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: BodylineColors.teal,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: const Text('Taken'),
+              ),
+            ],
           ],
         ),
       ),
@@ -335,10 +246,14 @@ class TodaysDosesPanelState extends State<TodaysDosesPanel> {
   }
 
   Widget _card({required Widget child}) {
+    final dense = widget.compact || widget.mode == TodaysDosesMode.detailList;
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.all(14),
+      margin: EdgeInsets.only(bottom: dense ? 2 : 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: dense ? 10 : 14,
+        vertical: dense ? 8 : 14,
+      ),
       decoration: BoxDecoration(
         color: BodylineColors.surface,
         borderRadius: BorderRadius.circular(BodylineRadii.cardSmall),

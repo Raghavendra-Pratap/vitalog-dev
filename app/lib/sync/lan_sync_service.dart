@@ -145,6 +145,8 @@ class LanSyncService extends ChangeNotifier {
   Timer? _debounceTimer;
   Timer? _pinRotateTimer;
   Timer? _pinTickTimer;
+  /// PIN countdown only — does not notify [LanSyncService] listeners (avoids shell redraw).
+  final ValueNotifier<int> pinTick = ValueNotifier<int>(0);
   bool _syncBusy = false;
   DateTime? _lastAutoSyncAt;
 
@@ -273,10 +275,10 @@ class LanSyncService extends ChangeNotifier {
         unawaited(refreshPairingPin(fromTimer: true));
       },
     );
-    // UI countdown tick
+    // PIN countdown only — SyncScreen listens to [pinTick], not the whole app shell.
     _pinTickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!hubRunning) return;
-      notifyListeners();
+      pinTick.value++;
     });
   }
 

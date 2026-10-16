@@ -9,7 +9,8 @@ import 'models.dart';
 
 /// Opt-in bridge to Google Health Connect (Android) / Apple HealthKit (iOS).
 ///
-/// Scope (ADR-011): weight, blood glucose, blood pressure — read + optional write.
+/// Scope (ADR-011 / 011a): weight, glucose, BP, steps, sleep duration —
+/// read + manual edit + optional write. Sleep stages out of scope.
 /// Data never leaves the device except into the OS health store the user chose.
 class HealthConnectService {
   HealthConnectService();
@@ -26,9 +27,13 @@ class HealthConnectService {
     HealthDataType.BLOOD_GLUCOSE,
     HealthDataType.BLOOD_PRESSURE_SYSTOLIC,
     HealthDataType.BLOOD_PRESSURE_DIASTOLIC,
+    HealthDataType.STEPS,
+    HealthDataType.SLEEP_ASLEEP,
   ];
 
   static const permissions = <HealthDataAccess>[
+    HealthDataAccess.READ_WRITE,
+    HealthDataAccess.READ_WRITE,
     HealthDataAccess.READ_WRITE,
     HealthDataAccess.READ_WRITE,
     HealthDataAccess.READ_WRITE,
@@ -167,10 +172,15 @@ class HealthConnectService {
     var weight = 0;
     var glucose = 0;
     var bp = 0;
+    var steps = 0;
+    var sleep = 0;
     var skipped = 0;
 
     // Group BP systolic/diastolic by minute bucket so one report can hold both.
     final bpBuckets = <int, _BpPair>{};
+    // Aggregate steps / sleep-asleep minutes by calendar day.
+    final stepByDay = <String, _DayAgg>{};
+    final sleepByDay = <String, _DayAgg>{};
 
     for (final p in points) {
       final numVal = _numeric(p);
@@ -243,6 +253,37 @@ class HealthConnectService {
             pair.diaExt = ext;
           }
           break;
+        case HealthDataType.STEPS:
+          final day = _dayKey(observed);
+          final agg = stepByDay.putIfAbsent(
+            day,
+            () => _DayAgg(observed, ext),
+          );
+          agg.value += numVal;
+          if (observed.isAfter(agg.at)) {
+            agg.at = observed;
+            agg.ext = ext;
+          }
+          break;
+        case HealthDataType.SLEEP_ASLEEP:
+          // Prefer sample span; fall back to numeric minutes.
+          final spanMin = p.dateTo.difference(p.dateFrom).inMinutes;
+          final mins = spanMin > 0 ? spanMin.toDouble() : numVal;
+          if (mins <= 0) {
+            skipped++;
+            break;
+          }
+          final day = _dayKey(observed);
+          final agg = sleepByDay.putIfAbsent(
+            day,
+            () => _DayAgg(observed, ext),
+          );
+          agg.value += mins;
+          if (observed.isAfter(agg.at)) {
+            agg.at = observed;
+            agg.ext = ext;
+          }
+          break;
         default:
           skipped++;
       }
@@ -289,14 +330,75 @@ class HealthConnectService {
       }
     }
 
+    for (final e in stepByDay.entries) {
+      final agg = e.value;
+      final total = agg.value.round();
+      if (total <= 0) continue;
+      final r = await store.addManualPanel(
+        profileId: profileId,
+        title: 'Health · Steps',
+        collectedAt: agg.at,
+        source: _reportSource(),
+        values: [
+          ManualObservationInput(
+            parameterCode: 'steps',
+            parameterName: 'Steps',
+            valueReported: '$total',
+            unitReported: 'steps',
+            externalId: 'hc:steps:${e.key}',
+            source: _obsSource(),
+          ),
+        ],
+      );
+      if (r != null) {
+        steps++;
+      } else {
+        skipped++;
+      }
+    }
+
+    for (final e in sleepByDay.entries) {
+      final agg = e.value;
+      if (agg.value <= 0) continue;
+      final hours = agg.value / 60.0;
+      final r = await store.addManualPanel(
+        profileId: profileId,
+        title: 'Health · Sleep',
+        collectedAt: agg.at,
+        source: _reportSource(),
+        values: [
+          ManualObservationInput(
+            parameterCode: 'sleep_hrs',
+            parameterName: 'Sleep duration',
+            valueReported: _fmt(hours),
+            unitReported: 'h',
+            externalId: 'hc:sleep:${e.key}',
+            source: _obsSource(),
+          ),
+        ],
+      );
+      if (r != null) {
+        sleep++;
+      } else {
+        skipped++;
+      }
+    }
+
     await _touchLastSync();
     return HealthImportResult(
       weight: weight,
       glucose: glucose,
       bloodPressure: bp,
+      steps: steps,
+      sleep: sleep,
       skipped: skipped,
     );
   }
+
+  String _dayKey(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
   /// Push a single Vitalog reading to the OS health store (if write enabled).
   Future<bool> writeReading({
@@ -331,6 +433,28 @@ class HealthConnectService {
           type: HealthDataType.BLOOD_GLUCOSE,
           startTime: at,
           endTime: at,
+          recordingMethod: RecordingMethod.manual,
+        );
+      }
+      if (code == 'steps') {
+        return await _health.writeHealthData(
+          value: value,
+          type: HealthDataType.STEPS,
+          startTime: at,
+          endTime: at,
+          recordingMethod: RecordingMethod.manual,
+        );
+      }
+      if (code == 'sleep_hrs') {
+        final mins = (value * 60).round();
+        if (mins <= 0) return false;
+        final end = at;
+        final start = end.subtract(Duration(minutes: mins));
+        return await _health.writeHealthData(
+          value: mins.toDouble(),
+          type: HealthDataType.SLEEP_ASLEEP,
+          startTime: start,
+          endTime: end,
           recordingMethod: RecordingMethod.manual,
         );
       }
@@ -407,15 +531,19 @@ class HealthImportResult {
     required this.weight,
     required this.glucose,
     required this.bloodPressure,
+    required this.steps,
+    required this.sleep,
     required this.skipped,
   });
 
   final int weight;
   final int glucose;
   final int bloodPressure;
+  final int steps;
+  final int sleep;
   final int skipped;
 
-  int get imported => weight + glucose + bloodPressure;
+  int get imported => weight + glucose + bloodPressure + steps + sleep;
 
   String get summary {
     if (imported == 0) {
@@ -427,6 +555,8 @@ class HealthImportResult {
     if (weight > 0) parts.add('$weight weight');
     if (glucose > 0) parts.add('$glucose glucose');
     if (bloodPressure > 0) parts.add('$bloodPressure blood pressure');
+    if (steps > 0) parts.add('$steps steps days');
+    if (sleep > 0) parts.add('$sleep sleep nights');
     return 'Imported ${parts.join(', ')}.';
   }
 }
@@ -438,4 +568,11 @@ class _BpPair {
   int? dia;
   String? sysExt;
   String? diaExt;
+}
+
+class _DayAgg {
+  _DayAgg(this.at, this.ext);
+  DateTime at;
+  String? ext;
+  double value = 0;
 }

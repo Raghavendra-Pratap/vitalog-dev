@@ -32,6 +32,9 @@ class _OrganDetailScreenState extends State<OrganDetailScreen> {
   List<ObservationRecord> _rows = [];
   List<MedicalItem> _meds = [];
   List<MedicalItem> _family = [];
+  List<MedicalItem> _conditions = [];
+  String? _kbWhat;
+  String? _kbKeyTests;
   var _loading = true;
   String? _selectedCode;
 
@@ -71,12 +74,26 @@ class _OrganDetailScreenState extends State<OrganDetailScreen> {
         return a.parameterName.compareTo(b.parameterName);
       });
 
+    // Knowledge base + relevance tokens for this organ.
+    final info = await store.systemInfo(widget.systemCode);
+    final meta = await store.bodySystemMeta(widget.systemCode);
+    final paramNames = await store.parameterNamesForSystem(widget.systemCode);
+    final tokens = _relevanceTokens(
+      systemCode: widget.systemCode,
+      systemName: meta.name ?? title,
+      covers: meta.covers,
+      keyTests: info['key_tests'],
+      parameterLabels: paramNames,
+    );
+
     List<MedicalItem> meds = const [];
     List<MedicalItem> family = const [];
+    List<MedicalItem> conditions = const [];
     final pid = store.activeProfileId;
     if (pid != null) {
-      meds = await store.listMedications(pid);
-      family = await store.listFamilyHistory(pid);
+      meds = _filterRelevant(await store.listMedications(pid), tokens);
+      family = _filterRelevant(await store.listFamilyHistory(pid), tokens);
+      conditions = _filterRelevant(await store.listConditions(pid), tokens);
     }
 
     if (!mounted) return;
@@ -85,6 +102,9 @@ class _OrganDetailScreenState extends State<OrganDetailScreen> {
       _rows = rows;
       _meds = meds;
       _family = family;
+      _conditions = conditions;
+      _kbWhat = info['what_it_does'];
+      _kbKeyTests = info['key_tests'];
       _loading = false;
       if (_selectedCode == null && rows.isNotEmpty) {
         _selectedCode = rows.first.parameterCode;
@@ -93,6 +113,65 @@ class _OrganDetailScreenState extends State<OrganDetailScreen> {
         _selectedCode = rows.isEmpty ? null : rows.first.parameterCode;
       }
     });
+  }
+
+  /// Tokens from catalogue KB + parameter names (not a drug formulary).
+  Set<String> _relevanceTokens({
+    required String systemCode,
+    required String systemName,
+    String? covers,
+    String? keyTests,
+    required List<String> parameterLabels,
+  }) {
+    final raw = <String>{
+      systemCode,
+      systemName,
+      if (covers != null) covers,
+      if (keyTests != null) keyTests,
+      ...parameterLabels,
+    };
+    const stop = {
+      'near', 'with', 'from', 'that', 'this', 'area', 'test', 'tests',
+      'often', 'also', 'into', 'over', 'under', 'about', 'blood', 'body',
+      'gland', 'glands', 'small', 'make', 'help', 'used', 'when', 'more',
+      'less', 'like', 'such', 'other', 'your', 'their',
+    };
+    final tokens = <String>{};
+    for (final chunk in raw) {
+      for (final part in chunk
+          .toLowerCase()
+          .split(RegExp(r'[^a-z0-9]+'))
+          .where((w) => w.isNotEmpty)) {
+        if (stop.contains(part)) continue;
+        if (part.length >= 4) tokens.add(part);
+        // Stem so "thyroid" matches Thyroxine / Thyronorm.
+        if (part.length >= 5) {
+          final stem = part.substring(0, 5);
+          if (!stop.contains(stem)) tokens.add(stem);
+        }
+      }
+    }
+    return tokens;
+  }
+
+  bool _itemMatches(MedicalItem item, Set<String> tokens) {
+    if (tokens.isEmpty) return false;
+    final hay = [
+      item.title,
+      if (item.subtitle != null) item.subtitle!,
+      if (item.kind != null) item.kind!,
+    ].join(' ').toLowerCase();
+    for (final t in tokens) {
+      if (hay.contains(t)) return true;
+    }
+    return false;
+  }
+
+  List<MedicalItem> _filterRelevant(
+    List<MedicalItem> items,
+    Set<String> tokens,
+  ) {
+    return [for (final i in items) if (_itemMatches(i, tokens)) i];
   }
 
   int _weight(ObservationFlag? f) {
@@ -196,6 +275,10 @@ class _OrganDetailScreenState extends State<OrganDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _statusChips(),
+                if (_kbWhat != null || _kbKeyTests != null) ...[
+                  const SizedBox(height: 12),
+                  _kbBlurb(),
+                ],
                 const SizedBox(height: 16),
                 Text(
                   'Linked tests',
@@ -242,12 +325,18 @@ class _OrganDetailScreenState extends State<OrganDetailScreen> {
                           ),
                         ),
                 ),
-                if (_meds.isNotEmpty || _family.isNotEmpty) ...[
+                if (_meds.isNotEmpty || _family.isNotEmpty || _conditions.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Text(
                     'Related in your profile',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  Text(
+                    'Medications, conditions, and family history that match this area',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: BodylineColors.inkSubtle,
                         ),
                   ),
                   const SizedBox(height: 8),
@@ -273,7 +362,27 @@ class _OrganDetailScreenState extends State<OrganDetailScreen> {
                               ].join(' · '),
                               Icons.medication_outlined,
                             ),
-                            if (i < _meds.length - 1 || _family.isNotEmpty)
+                            if (i < _meds.length - 1 ||
+                                _family.isNotEmpty ||
+                                _conditions.isNotEmpty)
+                              Divider(
+                                height: 1,
+                                color: BodylineColors.divider,
+                              ),
+                          ],
+                          for (var i = 0; i < _conditions.length; i++) ...[
+                            _relatedRow(
+                              _conditions[i].title,
+                              [
+                                if (_conditions[i].subtitle?.isNotEmpty ==
+                                    true)
+                                  _conditions[i].subtitle!,
+                                'Condition',
+                              ].join(' · '),
+                              Icons.healing_outlined,
+                            ),
+                            if (i < _conditions.length - 1 ||
+                                _family.isNotEmpty)
                               Divider(
                                 height: 1,
                                 color: BodylineColors.divider,
@@ -343,6 +452,10 @@ class _OrganDetailScreenState extends State<OrganDetailScreen> {
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       children: [
         _statusChips(),
+        if (_kbWhat != null || _kbKeyTests != null) ...[
+          const SizedBox(height: 12),
+          _kbBlurb(),
+        ],
         const SizedBox(height: 20),
         Text(
           'Linked tests',
@@ -379,11 +492,17 @@ class _OrganDetailScreenState extends State<OrganDetailScreen> {
               ],
             ),
           ),
-        if (_meds.isNotEmpty || _family.isNotEmpty) ...[
+        if (_meds.isNotEmpty || _family.isNotEmpty || _conditions.isNotEmpty) ...[
           const SizedBox(height: 24),
           Text(
             'Related in your profile',
             style: Theme.of(context).textTheme.titleLarge,
+          ),
+          Text(
+            'Medications, conditions, and family history that match this area',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: BodylineColors.inkSubtle,
+                ),
           ),
           const SizedBox(height: 8),
           Container(
@@ -398,20 +517,33 @@ class _OrganDetailScreenState extends State<OrganDetailScreen> {
                   _relatedRow(
                     _meds[i].title,
                     [
-                      if (_meds[i].subtitle?.isNotEmpty == true)
-                        _meds[i].subtitle!,
+                      if (_meds[i].subtitle?.isNotEmpty == true) _meds[i].subtitle!,
                       'Medication',
                     ].join(' · '),
                     Icons.medication_outlined,
                   ),
-                  if (i < _meds.length - 1 || _family.isNotEmpty)
+                  if (i < _meds.length - 1 ||
+                      _family.isNotEmpty ||
+                      _conditions.isNotEmpty)
+                    Divider(height: 1, color: BodylineColors.divider),
+                ],
+                for (var i = 0; i < _conditions.length; i++) ...[
+                  _relatedRow(
+                    _conditions[i].title,
+                    [
+                      if (_conditions[i].subtitle?.isNotEmpty == true)
+                        _conditions[i].subtitle!,
+                      'Condition',
+                    ].join(' · '),
+                    Icons.healing_outlined,
+                  ),
+                  if (i < _conditions.length - 1 || _family.isNotEmpty)
                     Divider(height: 1, color: BodylineColors.divider),
                 ],
                 for (var i = 0; i < _family.length; i++) ...[
                   _relatedRow(
                     [
-                      if (_family[i].subtitle?.isNotEmpty == true)
-                        _family[i].subtitle!,
+                      if (_family[i].subtitle?.isNotEmpty == true) _family[i].subtitle!,
                       _family[i].title,
                     ].join(' · '),
                     'Family history',
@@ -572,6 +704,35 @@ class _OrganDetailScreenState extends State<OrganDetailScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _kbBlurb() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: BodylineColors.surface,
+        borderRadius: BorderRadius.circular(BodylineRadii.cardSmall),
+        border: Border.all(color: BodylineColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_kbWhat != null)
+            Text(
+              _kbWhat!,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          if (_kbWhat != null && _kbKeyTests != null) const SizedBox(height: 8),
+          if (_kbKeyTests != null)
+            Text(
+              'Often checked: ${_kbKeyTests!.replaceAll(';', ' ·')}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: BodylineColors.inkSubtle,
+                  ),
+            ),
+        ],
       ),
     );
   }

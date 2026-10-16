@@ -13,6 +13,9 @@ import '../profile/profile_screen.dart';
 import '../tests/tests_screen.dart';
 import '../records/records_screen.dart';
 import 'desktop_shell.dart';
+import '../medicines/dose_wait_controller.dart';
+import '../medicines/dose_wait_header_chip.dart';
+import '../medicines/dose_wait_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({
@@ -68,18 +71,36 @@ class _AppShellState extends State<AppShell> {
     final hideFab = _tab == 3;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: IndexedStack(
-        index: _tab,
+      body: Stack(
         children: [
-          HomeScreen(store: store, onChanged: _refresh),
-          TestsScreen(store: store, onChanged: _refresh),
-          RecordsScreen(
-            store: store,
-            onAdd: () {
-              _openAdd();
-            },
+          IndexedStack(
+            index: _tab,
+            children: [
+              HomeScreen(store: store, onChanged: _refresh),
+              TestsScreen(store: store, onChanged: _refresh),
+              RecordsScreen(
+                store: store,
+                onAdd: () {
+                  _openAdd();
+                },
+              ),
+              ProfileScreen(store: store, onChanged: _refresh, lock: widget.lock, theme: widget.theme, sync: widget.sync),
+            ],
           ),
-          ProfileScreen(store: store, onChanged: _refresh, lock: widget.lock, theme: widget.theme, sync: widget.sync),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 4,
+            right: 12,
+            child: DoseWaitHeaderChip(
+              onOpen: () {
+                final mode = DoseWaitController.instance.mode;
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => DoseWaitScreen(mode: mode),
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
       floatingActionButton: hideFab

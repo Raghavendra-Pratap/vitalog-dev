@@ -1,6 +1,7 @@
 import 'package:image_picker/image_picker.dart';
 
 import 'ocr_exception.dart';
+import 'ocr_layout.dart';
 
 class OcrService {
   OcrService({ImagePicker? picker}) : _picker = picker ?? ImagePicker();
@@ -14,6 +15,9 @@ class OcrService {
       _picker.pickImage(source: source, imageQuality: 92);
 
   Future<String?> recognizeFile(String path) async =>
+      throw const OcrException(OcrFailKind.unsupported);
+
+  Future<OcrExtractResult?> recognizeXFileDetailed(XFile file) async =>
       throw const OcrException(OcrFailKind.unsupported);
 
   Future<String?> recognizeXFile(XFile file) async =>

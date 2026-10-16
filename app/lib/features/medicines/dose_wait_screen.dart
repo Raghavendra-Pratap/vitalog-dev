@@ -42,21 +42,41 @@ class _DoseTimerViewState extends State<DoseTimerView> {
   int _hours = 0;
   int _minutes = 30;
   int _seconds = 0;
+  late final FixedExtentScrollController _hoursCtrl;
+  late final FixedExtentScrollController _minutesCtrl;
+  late final FixedExtentScrollController _secondsCtrl;
 
   @override
   void initState() {
     super.initState();
+    _hoursCtrl = FixedExtentScrollController(initialItem: _hours);
+    _minutesCtrl = FixedExtentScrollController(initialItem: _minutes);
+    _secondsCtrl = FixedExtentScrollController(initialItem: _seconds);
     DoseWaitController.instance.addListener(_tick);
   }
 
   @override
   void dispose() {
     DoseWaitController.instance.removeListener(_tick);
+    _hoursCtrl.dispose();
+    _minutesCtrl.dispose();
+    _secondsCtrl.dispose();
     super.dispose();
   }
 
   void _tick() {
     if (mounted) setState(() {});
+  }
+
+  void _applyPreset(int minutes) {
+    setState(() {
+      _hours = 0;
+      _minutes = minutes;
+      _seconds = 0;
+    });
+    _hoursCtrl.jumpToItem(0);
+    _minutesCtrl.jumpToItem(minutes);
+    _secondsCtrl.jumpToItem(0);
   }
 
   Future<void> _start() async {
@@ -71,8 +91,7 @@ class _DoseTimerViewState extends State<DoseTimerView> {
   @override
   Widget build(BuildContext context) {
     final wait = DoseWaitController.instance;
-    final running =
-        wait.isRunning && wait.mode == DoseWaitMode.countdown;
+    final running = wait.countdownRunning;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -95,7 +114,7 @@ class _DoseTimerViewState extends State<DoseTimerView> {
         Text(
           running
               ? DoseWaitController.formatDuration(
-                  wait.remaining ?? Duration.zero)
+                  wait.countdownRemaining ?? Duration.zero)
               : _fmtHms(_hours, _minutes, _seconds),
           textAlign: TextAlign.center,
           style: const TextStyle(
@@ -115,26 +134,29 @@ class _DoseTimerViewState extends State<DoseTimerView> {
           Row(
             children: [
               Expanded(
-                child: _stepper(
+                child: _scrollWheel(
                   label: 'Hours',
                   value: _hours,
                   max: 23,
+                  controller: _hoursCtrl,
                   onChanged: (v) => setState(() => _hours = v),
                 ),
               ),
               Expanded(
-                child: _stepper(
+                child: _scrollWheel(
                   label: 'Minutes',
                   value: _minutes,
                   max: 59,
+                  controller: _minutesCtrl,
                   onChanged: (v) => setState(() => _minutes = v),
                 ),
               ),
               Expanded(
-                child: _stepper(
+                child: _scrollWheel(
                   label: 'Seconds',
                   value: _seconds,
                   max: 59,
+                  controller: _secondsCtrl,
                   onChanged: (v) => setState(() => _seconds = v),
                 ),
               ),
@@ -148,11 +170,7 @@ class _DoseTimerViewState extends State<DoseTimerView> {
             children: [
               for (final m in [10, 15, 30])
                 OutlinedButton(
-                  onPressed: () => setState(() {
-                    _hours = 0;
-                    _minutes = m;
-                    _seconds = 0;
-                  }),
+                  onPressed: () => _applyPreset(m),
                   child: Text('00:${m.toString().padLeft(2, '0')}:00'),
                 ),
             ],
@@ -175,7 +193,7 @@ class _DoseTimerViewState extends State<DoseTimerView> {
         ] else
           Center(
             child: FilledButton(
-              onPressed: () => DoseWaitController.instance.stop(),
+              onPressed: () => DoseWaitController.instance.stopCountdown(),
               style: FilledButton.styleFrom(
                 backgroundColor: BodylineColors.ink,
                 foregroundColor: BodylineColors.onInk,
@@ -190,10 +208,11 @@ class _DoseTimerViewState extends State<DoseTimerView> {
     );
   }
 
-  Widget _stepper({
+  Widget _scrollWheel({
     required String label,
     required int value,
     required int max,
+    required FixedExtentScrollController controller,
     required ValueChanged<int> onChanged,
   }) {
     return Column(
@@ -207,21 +226,35 @@ class _DoseTimerViewState extends State<DoseTimerView> {
           ),
         ),
         const SizedBox(height: 6),
-        IconButton(
-          onPressed: () => onChanged(value >= max ? 0 : value + 1),
-          icon: const Icon(Icons.keyboard_arrow_up),
-        ),
-        Text(
-          value.toString().padLeft(2, '0'),
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            fontFeatures: [FontFeature.tabularFigures()],
+        SizedBox(
+          height: 120,
+          child: ListWheelScrollView.useDelegate(
+            controller: controller,
+            itemExtent: 36,
+            diameterRatio: 1.35,
+            perspective: 0.003,
+            physics: const FixedExtentScrollPhysics(),
+            onSelectedItemChanged: onChanged,
+            childDelegate: ListWheelChildBuilderDelegate(
+              childCount: max + 1,
+              builder: (context, index) {
+                final selected = index == value;
+                return Center(
+                  child: Text(
+                    index.toString().padLeft(2, '0'),
+                    style: TextStyle(
+                      fontSize: selected ? 26 : 18,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                      color: selected
+                          ? BodylineColors.ink
+                          : BodylineColors.inkSubtle,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
-        ),
-        IconButton(
-          onPressed: () => onChanged(value <= 0 ? max : value - 1),
-          icon: const Icon(Icons.keyboard_arrow_down),
         ),
       ],
     );
@@ -262,16 +295,15 @@ class _DoseStopwatchViewState extends State<DoseStopwatchView> {
   @override
   Widget build(BuildContext context) {
     final wait = DoseWaitController.instance;
-    final running =
-        wait.isRunning && wait.mode == DoseWaitMode.stopwatch;
-    final hasLaps = wait.laps.isNotEmpty;
+    final running = wait.stopwatchRunning;
+    final hasLaps = wait.stopwatchLaps.isNotEmpty;
 
     final readout = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          wait.elapsed != null
-              ? DoseWaitController.formatStopwatch(wait.elapsed!)
+          wait.stopwatchElapsed != null
+              ? DoseWaitController.formatStopwatch(wait.stopwatchElapsed!)
               : '00:00.00',
           textAlign: TextAlign.center,
           style: const TextStyle(
@@ -306,7 +338,7 @@ class _DoseStopwatchViewState extends State<DoseStopwatchView> {
           ),
           const SizedBox(width: 16),
           FilledButton(
-            onPressed: () => DoseWaitController.instance.stop(),
+            onPressed: () => DoseWaitController.instance.stopStopwatch(),
             style: FilledButton.styleFrom(
               backgroundColor: BodylineColors.danger,
               foregroundColor: Colors.white,
@@ -404,10 +436,10 @@ class _DoseStopwatchViewState extends State<DoseStopwatchView> {
           const Divider(height: 16),
           Expanded(
             child: ListView.separated(
-              itemCount: wait.laps.length,
+              itemCount: wait.stopwatchLaps.length,
               separatorBuilder: (_, __) => const SizedBox(height: 6),
               itemBuilder: (context, i) {
-                final lap = wait.laps[i];
+                final lap = wait.stopwatchLaps[i];
                 return Row(
                   children: [
                     Expanded(

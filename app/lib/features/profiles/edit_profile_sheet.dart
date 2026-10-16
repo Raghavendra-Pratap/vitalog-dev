@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/bodyline_dialog.dart';
 import '../../widgets/month_year_date_picker.dart';
 
 import '../../data/local_store.dart';
@@ -95,12 +96,25 @@ Future<bool> showEditProfileDialog({
   final otherCtrl = TextEditingController(
     text: isCustom ? profile.relation : '',
   );
+  final heightCtrl = TextEditingController(
+    text: profile.heightCm == null
+        ? ''
+        : (profile.heightCm == profile.heightCm!.roundToDouble()
+            ? profile.heightCm!.toStringAsFixed(0)
+            : profile.heightCm.toString()),
+  );
   DateTime? dob;
   if (profile.dob != null && profile.dob!.isNotEmpty) {
     try {
       dob = DateTime.parse(profile.dob!);
     } catch (_) {}
   }
+  String? sex = switch ((profile.sex ?? '').trim().toLowerCase()) {
+    'm' || 'male' => 'M',
+    'f' || 'female' => 'F',
+    'other' => 'other',
+    _ => null,
+  };
 
   final ok = await showDialog<bool>(
     context: context,
@@ -117,29 +131,24 @@ Future<bool> showEditProfileDialog({
                     controller: name,
                     decoration: const InputDecoration(labelText: 'Name'),
                     textCapitalization: TextCapitalization.words,
-                    autofocus: true,
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: relation,
-                    items: [
+                  BodylineSelectField<String>(
+                    label: 'Relation to you',
+                    value: relation,
+                    valueLabel: profileRelationLabel(relation),
+                    options: [
+                      if (relation == 'self')
+                        const BodylineSelectOption(value: 'self', label: 'You'),
                       for (final r in profileRelationChoices(
                         include: relation == 'self' ? null : relation,
                       ))
-                        DropdownMenuItem(
+                        BodylineSelectOption(
                           value: r,
-                          child: Text(profileRelationLabel(r)),
-                        ),
-                      if (relation == 'self')
-                        const DropdownMenuItem(
-                          value: 'self',
-                          child: Text('You'),
+                          label: profileRelationLabel(r),
                         ),
                     ],
-                    onChanged: (v) => setLocal(() => relation = v ?? relation),
-                    decoration: const InputDecoration(
-                      labelText: 'Relation to you',
-                    ),
+                    onSelected: (v) => setLocal(() => relation = v),
                   ),
                   if (relation == 'other') ...[
                     const SizedBox(height: 12),
@@ -153,24 +162,56 @@ Future<bool> showEditProfileDialog({
                     ),
                   ],
                   const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      dob == null
-                          ? 'Date of birth (optional)'
-                          : 'DOB · ${dob!.year}-${dob!.month.toString().padLeft(2, '0')}-${dob!.day.toString().padLeft(2, '0')}',
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          dob == null
+                              ? 'Date of birth (optional)'
+                              : 'DOB · ${dob!.year}-${dob!.month.toString().padLeft(2, '0')}-${dob!.day.toString().padLeft(2, '0')}',
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await pickBodylineDate(
+                            ctx,
+                            initialDate: dob ?? DateTime(1990, 1, 1),
+                            firstDate: DateTime(1900),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null) setLocal(() => dob = picked);
+                        },
+                        child: Text(dob == null ? 'Set' : 'Change'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  BodylineSelectField<String?>(
+                    label: 'Sex',
+                    value: sex,
+                    valueLabel: switch (sex) {
+                      'M' => 'Male',
+                      'F' => 'Female',
+                      'other' => 'Other',
+                      _ => 'Prefer not to say',
+                    },
+                    options: const [
+                      BodylineSelectOption(value: null, label: 'Prefer not to say'),
+                      BodylineSelectOption(value: 'M', label: 'Male'),
+                      BodylineSelectOption(value: 'F', label: 'Female'),
+                      BodylineSelectOption(value: 'other', label: 'Other'),
+                    ],
+                    onSelected: (v) => setLocal(() => sex = v),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: heightCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Height (cm, optional)',
+                      hintText: 'e.g. 172',
                     ),
-                    trailing: TextButton(
-                      onPressed: () async {
-                        final picked = await pickBodylineDate(
-                        ctx,
-                          initialDate: dob ?? DateTime(1990, 1, 1),
-                          firstDate: DateTime(1900),
-                          lastDate: DateTime.now(),
-                        );
-                        if (picked != null) setLocal(() => dob = picked);
-                      },
-                      child: Text(dob == null ? 'Set' : 'Change'),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
                     ),
                   ),
                 ],
@@ -178,7 +219,10 @@ Future<bool> showEditProfileDialog({
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
+                onPressed: () {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  Navigator.pop(ctx, false);
+                },
                 child: const Text('Cancel'),
               ),
               FilledButton(
@@ -190,6 +234,7 @@ Future<bool> showEditProfileDialog({
                       otherCtrl.text.trim().isEmpty) {
                     return;
                   }
+                  FocusManager.instance.primaryFocus?.unfocus();
                   Navigator.pop(ctx, true);
                 },
                 child: const Text('Save'),
@@ -201,15 +246,18 @@ Future<bool> showEditProfileDialog({
     },
   );
 
-  if (ok != true) {
-    name.dispose();
-    otherCtrl.dispose();
-    return false;
-  }
+  // The dialog route is still animating out when this future completes.
+  // Disposing the fields' controllers in that window trips a Flutter
+  // assertion (_dependents.isEmpty) and replaces the screen with red.
   final trimmed = name.text.trim();
   final otherLabel = otherCtrl.text.trim();
-  name.dispose();
-  otherCtrl.dispose();
+  final heightRaw = heightCtrl.text.trim();
+  Future<void>.delayed(const Duration(milliseconds: 400), () {
+    name.dispose();
+    otherCtrl.dispose();
+    heightCtrl.dispose();
+  });
+  if (ok != true) return false;
   if (trimmed.isEmpty) return false;
 
   final savedRelation = relation == 'other'
@@ -222,12 +270,40 @@ Future<bool> showEditProfileDialog({
       : '${pickedDob.year.toString().padLeft(4, '0')}-'
           '${pickedDob.month.toString().padLeft(2, '0')}-'
           '${pickedDob.day.toString().padLeft(2, '0')}';
+  double? heightCm;
+  var clearHeight = false;
+  if (heightRaw.isEmpty) {
+    clearHeight = profile.heightCm != null;
+  } else {
+    heightCm = double.tryParse(heightRaw);
+    if (heightCm == null || heightCm < 50 || heightCm > 280) {
+      return false;
+    }
+  }
   await store.updateProfile(
     id: profile.id,
     name: trimmed,
     relation: savedRelation,
     dob: dobIso,
     clearDob: dobIso == null && (profile.dob != null && profile.dob!.isNotEmpty),
+    sex: sex,
+    clearSex: sex == null && (profile.sex != null && profile.sex!.isNotEmpty),
+    heightCm: heightCm,
+    clearHeightCm: clearHeight,
   );
+  if (heightCm != null &&
+      (profile.heightCm == null || (profile.heightCm! - heightCm).abs() >= 0.05)) {
+    final reported = heightCm == heightCm.roundToDouble()
+        ? heightCm.toStringAsFixed(0)
+        : heightCm.toStringAsFixed(1);
+    await store.recordVital(
+      profileId: profile.id,
+      parameterCode: 'height',
+      parameterName: 'Height',
+      valueReported: reported,
+      unitReported: 'cm',
+      title: 'Height',
+    );
+  }
   return true;
 }

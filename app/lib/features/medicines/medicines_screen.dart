@@ -8,6 +8,8 @@ import '../../notifications/reminder_notifications.dart';
 import '../../theme/tokens.dart';
 import '../../theme/desktop_layout.dart';
 import '../../desktop.dart';
+import 'medicine_editor_dialog.dart';
+import 'medicine_month_track.dart';
 
 enum _MedLeftMode { active, visit }
 
@@ -31,6 +33,45 @@ class MedicinesScreen extends StatefulWidget {
 class MedicinesScreenState extends State<MedicinesScreen> {
   Future<void> promptAdd() => _addMedicine();
 
+  Future<void> _applyScheduleFromResult(
+    String medId,
+    Map<String, Object?> result,
+  ) async {
+    final rawSlots = result['slots'];
+    final slots = <({String hm, double amount})>[];
+    if (rawSlots is List) {
+      for (final e in rawSlots) {
+        if (e is! Map) continue;
+        final hm = '${e['hm'] ?? ''}'.trim();
+        if (!hm.contains(':')) continue;
+        final a = e['amount'];
+        final amount = a is num
+            ? a.toDouble()
+            : double.tryParse('$a') ?? 1.0;
+        slots.add((hm: hm, amount: amount <= 0 ? 1.0 : amount));
+      }
+    }
+    await widget.store.softDeleteMedicationSchedules(medId);
+    if (slots.isEmpty) return;
+    final daysMask = (result['daysMask'] as String?) ?? '1111111';
+    final interval = result['intervalDays'] as int?;
+    final unit = result['doseUnit'] as String?;
+    await widget.store.addMedicationSchedule(
+      medicationId: medId,
+      times: [for (final s in slots) s.hm],
+      slots: slots,
+      daysMask: daysMask,
+      intervalDays: interval,
+      doseUnit: unit,
+    );
+    try {
+      await ReminderNotifications.instance.ensurePermission();
+      final schedules = await widget.store.listAllMedicationSchedules();
+      await ReminderNotifications.instance.rescheduleAllDoses(schedules);
+    } catch (_) {}
+  }
+
+
   List<MedicalItem> _meds = [];
   List<MedicalItem> _allMeds = [];
   List<VisitRecord> _visits = [];
@@ -38,6 +79,12 @@ class MedicinesScreenState extends State<MedicinesScreen> {
   String? _selectedVisitId;
   var _loading = true;
   var _loadGen = 0;
+  int _taken30 = 0;
+  int _skipped30 = 0;
+  Map<String, int> _takenByMed = {};
+  List<MedicationDoseSlot> _todayDoses = [];
+  String? _selectedMedId;
+  final Map<String, String> _timesByMed = {};
 
   @override
   void initState() {
@@ -61,6 +108,10 @@ class MedicinesScreenState extends State<MedicinesScreen> {
         _meds = [];
         _allMeds = [];
         _visits = [];
+        _taken30 = 0;
+        _skipped30 = 0;
+        _takenByMed = {};
+        _todayDoses = [];
         _loading = false;
       });
       return;
@@ -68,12 +119,60 @@ class MedicinesScreenState extends State<MedicinesScreen> {
     final meds = await widget.store.listMedications(pid);
     final allMeds = await widget.store.listAllMedications(pid);
     final visits = await widget.store.listVisits(pid);
+    final outcomes = await widget.store.countDoseOutcomesLastDays(pid);
+    final takenBy = await widget.store.takenCountsLastDays(pid);
+    final todayDoses = await widget.store.listTodaysDoses(pid);
+    final allSchedules = await widget.store.listAllMedicationSchedules();
+    final timesByMed = <String, String>{};
+    final grouped = <String, List<String>>{};
+    for (final s in allSchedules) {
+      grouped.putIfAbsent(s.medicationId, () => []).addAll(s.times);
+    }
+    for (final e in grouped.entries) {
+      timesByMed[e.key] = e.value.join(', ');
+    }
+    // Also schedules for completed meds in view — load per selected later if needed.
+    for (final m in allMeds) {
+      if (timesByMed.containsKey(m.id)) continue;
+      final schedules = await widget.store.listMedicationSchedules(m.id);
+      final times = <String>[];
+      for (final s in schedules) {
+        final raw = s.title.trim();
+        if (raw.startsWith('[')) {
+          try {
+            // times_json stored in title by listMedicationSchedules
+            final cleaned = raw
+                .replaceAll('"', '')
+                .replaceAll('[', '')
+                .replaceAll(']', '');
+            times.addAll(
+              cleaned.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty),
+            );
+          } catch (_) {}
+        }
+      }
+      if (times.isNotEmpty) timesByMed[m.id] = times.join(', ');
+    }
     if (!mounted || gen != _loadGen) return;
     setState(() {
       _meds = meds;
       _allMeds = allMeds;
       _visits = visits;
+      _taken30 = outcomes.taken;
+      _skipped30 = outcomes.skipped;
+      _takenByMed = takenBy;
+      _todayDoses = todayDoses;
+      _timesByMed
+        ..clear()
+        ..addAll(timesByMed);
       _loading = false;
+      if (_selectedMedId != null &&
+          !meds.any((x) => x.id == _selectedMedId) &&
+          !allMeds.any((x) => x.id == _selectedMedId)) {
+        _selectedMedId = meds.isEmpty ? null : meds.first.id;
+      } else if (_selectedMedId == null && meds.isNotEmpty) {
+        _selectedMedId = meds.first.id;
+      }
       if (_selectedVisitId != null &&
           !allMeds.any((x) => x.visitId == _selectedVisitId)) {
         _selectedVisitId = null;
@@ -91,13 +190,16 @@ class MedicinesScreenState extends State<MedicinesScreen> {
     final upcoming = await _upcomingFollowUps(pid);
     if (!mounted) return;
 
-    final result = await showDialog<Map<String, String>>(
+    final result = await showMedicineEditorDialog(
       context: context,
-      builder: (ctx) => _AddMedicineDialog(upcomingFollowUps: upcoming),
+      store: widget.store,
+      upcomingFollowUps: [
+        for (final o in upcoming) (dateYmd: o.dateYmd, label: o.label),
+      ],
     );
     if (result == null || !mounted) return;
 
-    final name = (result['name'] ?? '').trim();
+    final name = '${result['name'] ?? ''}'.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter a medicine name to save.')),
@@ -106,20 +208,23 @@ class MedicinesScreenState extends State<MedicinesScreen> {
     }
 
     final pillsRaw = result['pills'];
-    final pillCount = pillsRaw == null ? null : int.tryParse(pillsRaw);
+    final pillCount =
+        pillsRaw == null ? null : int.tryParse('$pillsRaw');
 
     try {
       final medId = await widget.store.addMedication(
         profileId: pid,
         name: name,
-        kind: result['kind'] ?? 'other',
-        strength: result['strength'],
-        instructions: result['instructions'],
+        kind: '${result['kind'] ?? 'other'}',
+        strength: result['strength'] as String?,
+        instructions: result['instructions'] as String?,
         pillCount: pillCount,
-        restockOn: result['restock'],
+        restockOn: result['restock'] as String?,
+        dosageForm: result['dosageForm'] as String?,
+        endDate: result['endDate'] as String?,
       );
 
-      final restock = result['restock'];
+      final restock = result['restock'] as String?;
       if (restock != null && restock.trim().isNotEmpty) {
         try {
           final parts = restock.trim().split('-');
@@ -143,28 +248,10 @@ class MedicinesScreenState extends State<MedicinesScreen> {
         } catch (_) {}
       }
 
-      final timesRaw = result['times'];
-      if (timesRaw != null && timesRaw.trim().isNotEmpty) {
-        final times = timesRaw
-            .split(',')
-            .map((s) => s.trim())
-            .where((s) => s.isNotEmpty)
-            .toList();
-        if (times.isNotEmpty) {
-          await widget.store.addMedicationSchedule(
-            medicationId: medId,
-            times: times,
-          );
-          try {
-            await ReminderNotifications.instance.ensurePermission();
-            final schedules = await widget.store.listAllMedicationSchedules();
-            await ReminderNotifications.instance.rescheduleAllDoses(schedules);
-          } catch (_) {}
-        }
-      }
+      await _applyScheduleFromResult(medId, result);
 
       if (mounted) {
-        final note = result['stockNote'];
+        final note = result['stockNote'] as String?;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -192,50 +279,35 @@ class MedicinesScreenState extends State<MedicinesScreen> {
     if (pid == null) return;
     final upcoming = await _upcomingFollowUps(pid);
     if (!mounted) return;
-    final result = await showDialog<Map<String, String>>(
+    final result = await showMedicineEditorDialog(
       context: context,
-      builder: (ctx) => _AddMedicineDialog(
-        upcomingFollowUps: upcoming,
-        initial: m,
-      ),
+      store: widget.store,
+      initial: m,
+      upcomingFollowUps: [
+        for (final o in upcoming) (dateYmd: o.dateYmd, label: o.label),
+      ],
     );
     if (result == null || !mounted) return;
-    final name = (result['name'] ?? '').trim();
+    final name = '${result['name'] ?? ''}'.trim();
     if (name.isEmpty) return;
     final pillsRaw = result['pills'];
-    final pillCount = pillsRaw == null ? null : int.tryParse(pillsRaw);
+    final pillCount =
+        pillsRaw == null ? null : int.tryParse('$pillsRaw');
     try {
       await widget.store.updateMedication(
         id: m.id,
         name: name,
-        kind: result['kind'] ?? m.kind ?? 'other',
-        strength: result['strength'],
-        instructions: result['instructions'],
+        kind: '${result['kind'] ?? m.kind ?? 'other'}',
+        strength: result['strength'] as String?,
+        instructions: result['instructions'] as String?,
         pillCount: pillCount,
-        restockOn: result['restock'],
-        prescribedAs: result['prescribedAs'] ?? m.prescribedAs,
-        dosageForm: result['dosageForm'],
-        endDate: result['endDate'],
+        restockOn: result['restock'] as String?,
+        prescribedAs:
+            (result['prescribedAs'] as String?) ?? m.prescribedAs,
+        dosageForm: result['dosageForm'] as String?,
+        endDate: result['endDate'] as String?,
       );
-      final timesRaw = result['times'];
-      if (timesRaw != null && timesRaw.trim().isNotEmpty) {
-        final times = timesRaw
-            .split(',')
-            .map((s) => s.trim())
-            .where((s) => s.isNotEmpty)
-            .toList();
-        if (times.isNotEmpty) {
-          await widget.store.addMedicationSchedule(
-            medicationId: m.id,
-            times: times,
-          );
-          try {
-            await ReminderNotifications.instance.ensurePermission();
-            final schedules = await widget.store.listAllMedicationSchedules();
-            await ReminderNotifications.instance.rescheduleAllDoses(schedules);
-          } catch (_) {}
-        }
-      }
+      await _applyScheduleFromResult(m.id, result);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Updated $name.')),
@@ -407,7 +479,7 @@ class MedicinesScreenState extends State<MedicinesScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            width: DesktopLayout.testsMasterCol,
+            width: 280,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -419,6 +491,9 @@ class MedicinesScreenState extends State<MedicinesScreen> {
                   onTap: () => setState(() {
                     _leftMode = _MedLeftMode.active;
                     _selectedVisitId = null;
+                    if (_meds.isNotEmpty) {
+                      _selectedMedId = _meds.first.id;
+                    }
                   }),
                 ),
                 const SizedBox(height: 16),
@@ -466,10 +541,77 @@ class MedicinesScreenState extends State<MedicinesScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 20),
+          const SizedBox(width: DesktopLayout.mainGap),
           Expanded(child: _medicineCardsPane(context)),
+          const SizedBox(width: DesktopLayout.mainGap),
+          SizedBox(
+            width: 260,
+            child: _trackSettingsRail(context),
+          ),
         ],
       ),
+    );
+  }
+
+  /// Layout B col 3: settings + one-month track for the selected medicine.
+  Widget _trackSettingsRail(BuildContext context) {
+    final pool = _paneMeds;
+    MedicalItem? selected;
+    if (_selectedMedId != null) {
+      for (final m in pool) {
+        if (m.id == _selectedMedId) {
+          selected = m;
+          break;
+        }
+      }
+    }
+    if (selected == null && pool.isNotEmpty) {
+      selected = pool.first;
+    }
+    if (selected == null) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: BodylineColors.surface,
+          borderRadius: BorderRadius.circular(BodylineRadii.card),
+          border: Border.all(color: BodylineColors.border),
+        ),
+        child: Text(
+          pool.isEmpty
+              ? 'Select Active or a visit, then a medicine.'
+              : 'Select a medicine to see its month track.',
+          style: TextStyle(color: BodylineColors.inkSubtle, fontSize: 13),
+        ),
+      );
+    }
+    return ListView(
+      children: [
+        MedicineSettingsCard(
+          medication: selected,
+          timesLabel: _timesByMed[selected.id],
+          onEdit: () => _editMedicine(selected!),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 420,
+          child: MedicineMonthTrack(
+            key: ValueKey('track-b-${selected.id}'),
+            store: widget.store,
+            medication: selected,
+            showHeader: false,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Mark taken or skipped under Reminders. '
+          'Days marked × are outside this course or have no dose times.',
+          style: TextStyle(
+            fontSize: 12,
+            color: BodylineColors.inkSubtle,
+            height: 1.35,
+          ),
+        ),
+      ],
     );
   }
 
@@ -529,6 +671,11 @@ class MedicinesScreenState extends State<MedicinesScreen> {
         onTap: () => setState(() {
           _leftMode = _MedLeftMode.visit;
           _selectedVisitId = v.id;
+          final linked = [
+            for (final m in _allMeds)
+              if (m.visitId == v.id) m,
+          ];
+          _selectedMedId = linked.isEmpty ? null : linked.first.id;
         }),
         child: Container(
           padding: const EdgeInsets.all(14),
@@ -572,6 +719,83 @@ class MedicinesScreenState extends State<MedicinesScreen> {
     return [for (final m in _allMeds) if (m.visitId == vid) m];
   }
 
+
+  Widget _adherenceStrip(BuildContext context) {
+    final pending = _todayDoses.where((d) => !d.isDone).length;
+    var nextLabel = 'No doses left today';
+    final upcoming = _todayDoses.where((d) => !d.isDone).toList()
+      ..sort((a, b) => a.scheduledFor.compareTo(b.scheduledFor));
+    if (upcoming.isNotEmpty) {
+      final n = upcoming.first;
+      nextLabel = 'Next · ${n.name} at ${n.timeHm}';
+    }
+    final refill = [
+      for (final m in _meds)
+        if (m.restockOn != null && m.restockOn!.isNotEmpty) m,
+    ];
+    var refillLabel = 'No refill dates set';
+    if (refill.isNotEmpty) {
+      refill.sort((a, b) => (a.restockOn!).compareTo(b.restockOn!));
+      final r = refill.first;
+      refillLabel = 'Refill · ${r.title} by ${r.restockOn}';
+    }
+
+    Widget cell(String k, String v) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: BodylineColors.chip,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: BodylineColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  k,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: BodylineColors.inkSubtle,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  v,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            cell('Last 30 days taken', '$_taken30'),
+            const SizedBox(width: 8),
+            cell('Skipped', '$_skipped30'),
+            const SizedBox(width: 8),
+            cell(
+              'Today',
+              pending == 0 ? 'All logged' : '$pending left',
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '$nextLabel · $refillLabel',
+          style: TextStyle(fontSize: 12, color: BodylineColors.inkSubtle),
+        ),
+      ],
+    );
+  }
+
   Widget _medicineCardsPane(BuildContext context) {
     final meds = _paneMeds;
     final title = _leftMode == _MedLeftMode.active
@@ -607,6 +831,10 @@ class MedicinesScreenState extends State<MedicinesScreen> {
                 : 'Medicines linked to this visit.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
+          if (_leftMode == _MedLeftMode.active) ...[
+            const SizedBox(height: 14),
+            _adherenceStrip(context),
+          ],
           const SizedBox(height: 16),
           if (meds.isEmpty)
             Text(
@@ -617,7 +845,12 @@ class MedicinesScreenState extends State<MedicinesScreen> {
             )
           else
             for (final m in meds) ...[
-              _medicineCard(m),
+              _medicineCard(
+                m,
+                taken30: _takenByMed[m.id] ?? 0,
+                selected: m.id == _selectedMedId,
+                onSelect: () => setState(() => _selectedMedId = m.id),
+              ),
               const SizedBox(height: 10),
             ],
         ],
@@ -625,13 +858,25 @@ class MedicinesScreenState extends State<MedicinesScreen> {
     );
   }
 
-  Widget _medicineCard(MedicalItem m) {
-    return Container(
+  Widget _medicineCard(
+    MedicalItem m, {
+    int taken30 = 0,
+    bool selected = false,
+    VoidCallback? onSelect,
+  }) {
+    return Material(
+      color: selected ? BodylineColors.selectedWash : BodylineColors.chip,
+      borderRadius: BorderRadius.circular(BodylineRadii.card),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(BodylineRadii.card),
+        onTap: onSelect,
+        child: Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
       decoration: BoxDecoration(
-        color: BodylineColors.chip,
         borderRadius: BorderRadius.circular(BodylineRadii.card),
-        border: Border.all(color: BodylineColors.border),
+        border: Border.all(
+          color: selected ? BodylineColors.teal : BodylineColors.border,
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -647,6 +892,11 @@ class MedicinesScreenState extends State<MedicinesScreen> {
                     fontSize: 15,
                   ),
                 ),
+                if (taken30 > 0)
+                  Text(
+                    '$taken30 taken in last 30 days',
+                    style: TextStyle(fontSize: 12, color: BodylineColors.inkSubtle),
+                  ),
                 if (m.subtitle != null) ...[
                   const SizedBox(height: 4),
                   Text(
@@ -692,6 +942,8 @@ class MedicinesScreenState extends State<MedicinesScreen> {
             ],
           ),
         ],
+      ),
+        ),
       ),
     );
   }
@@ -1324,6 +1576,7 @@ class _AddMedicineDialogState extends State<_AddMedicineDialog> {
                 controller: _name,
                 autofocus: true,
                 showKindSubtitle: true,
+                preferredKind: _kind,
                 decoration: InputDecoration(
                   labelText: 'Name',
                   hintText: 'As on the bottle or prescription',

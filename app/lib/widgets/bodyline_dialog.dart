@@ -14,6 +14,7 @@ Future<T?> showBodylineDialog<T>({
   List<Widget>? actions,
   bool showLockup = true,
   bool barrierDismissible = true,
+  double maxWidth = 440,
 }) {
   return showDialog<T>(
     context: context,
@@ -29,48 +30,51 @@ Future<T?> showBodylineDialog<T>({
           borderRadius: BorderRadius.circular(BodylineRadii.sheet),
           side: BorderSide(color: BodylineColors.border),
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (showLockup) ...[
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: BodylineLockup(markSize: 26, wordSize: 18),
-                ),
-                const SizedBox(height: 16),
-              ],
-              Text(
-                title,
-                style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 6),
+        child: SizedBox(
+          width: bodylineDialogWidth(ctx, maxWidth),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (showLockup) ...[
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: BodylineLockup(markSize: 26, wordSize: 18),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Text(
-                  subtitle,
-                  style: Theme.of(ctx).textTheme.bodyMedium,
+                  title,
+                  style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-              ],
-              const SizedBox(height: 18),
-              content,
-              if (actionWidgets.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    for (var i = 0; i < actionWidgets.length; i++) ...[
-                      if (i > 0) const SizedBox(width: 8),
-                      actionWidgets[i],
+                if (subtitle != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    style: Theme.of(ctx).textTheme.bodyMedium,
+                  ),
+                ],
+                const SizedBox(height: 18),
+                content,
+                if (actionWidgets.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      for (var i = 0; i < actionWidgets.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        actionWidgets[i],
+                      ],
                     ],
-                  ],
-                ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       );

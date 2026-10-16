@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 
 import '../../data/habits_notes_store.dart';
 import '../../data/local_store.dart';
+import '../../desktop.dart';
+import '../../theme/desktop_layout.dart';
 import '../../theme/tokens.dart';
 import 'habit_detail_screen.dart';
 import 'habit_editor.dart';
@@ -26,9 +28,12 @@ class HabitsScreen extends StatefulWidget {
 
 class HabitsScreenState extends State<HabitsScreen> {
   List<Map<String, Object?>> _habits = [];
-  Map<String, Map<String, Object?>> _logs = {};
+  /// habitId → ymd → log (last ~90 days) for list progress fractions.
+  Map<String, Map<String, Map<String, Object?>>> _rangeLogs = {};
   var _loading = true;
   String? _selectedId;
+  final _detailKey = GlobalKey<HabitDetailScreenState>();
+  var _notesTick = 0;
 
   String get _ymd => DateFormat('yyyy-MM-dd').format(DateTime.now());
 
@@ -50,24 +55,36 @@ class HabitsScreenState extends State<HabitsScreen> {
       if (!mounted) return;
       setState(() {
         _habits = [];
-        _logs = {};
+        _rangeLogs = {};
         _loading = false;
       });
       return;
     }
     final habits = await widget.store.listHabits(pid);
-    final logs = await widget.store.habitLogsForDay(pid, _ymd);
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day)
+        .subtract(const Duration(days: 89));
+    final range = await widget.store.habitLogsForRange(
+      pid,
+      DateFormat('yyyy-MM-dd').format(start),
+      _ymd,
+    );
     if (!mounted) return;
     setState(() {
       _habits = habits;
-      _logs = logs;
+      _rangeLogs = range;
       _loading = false;
-      if (_selectedId != null &&
+      if (_selectedId == null && habits.isNotEmpty) {
+        _selectedId = habits.first['id'] as String?;
+      } else if (_selectedId != null &&
           !habits.any((h) => h['id'] == _selectedId)) {
         _selectedId = habits.isEmpty ? null : habits.first['id'] as String?;
       }
     });
   }
+
+  /// Shell / Today call this so habit stats refresh after a log elsewhere.
+  Future<void> reload() => _load();
 
   Future<void> promptAdd() async {
     final ok = await showHabitEditor(context: context, store: widget.store);
@@ -98,192 +115,277 @@ class HabitsScreenState extends State<HabitsScreen> {
     await _load();
   }
 
-  Future<void> _quickLog(Map<String, Object?> h) async {
-    final pid = widget.store.activeProfileId;
-    if (pid == null) return;
-    final id = h['id']! as String;
-    final kind = (h['kind'] as String?) ?? 'yes_no';
-    final goal = (h['goal_value'] as num?)?.toDouble();
-    final log = _logs[id];
-    if (kind == 'yes_no') {
-      final done = (log?['done'] as int? ?? 0) == 1;
-      await widget.store.setHabitProgress(
-        habitId: id,
-        profileId: pid,
-        loggedOnYmd: _ymd,
-        kind: kind,
-        done: !done,
-        loggedByProfileId: storeActorId(widget.store),
-      );
-    } else {
-      final cur = (log?['value'] as num?)?.toDouble() ?? 0;
-      final step = kind == 'duration' ? 5.0 : 1.0;
-      final next = cur + step;
-      await widget.store.setHabitProgress(
-        habitId: id,
-        profileId: pid,
-        loggedOnYmd: _ymd,
-        kind: kind,
-        goalValue: goal,
-        value: next,
-        loggedByProfileId: storeActorId(widget.store),
+  String? get _profileName {
+    final id = widget.store.activeProfileId;
+    for (final p in widget.store.profiles) {
+      if (p.id == id) return p.name;
+    }
+    return widget.store.profiles.isEmpty
+        ? null
+        : widget.store.profiles.first.name;
+  }
+
+  ({int done, int scheduled}) _progress30(Map<String, Object?> h) {
+    final id = h['id'] as String?;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = today.subtract(const Duration(days: 29));
+    final s = habitWindowStats(
+      habit: h,
+      logs: id == null ? const {} : (_rangeLogs[id] ?? const {}),
+      start: start,
+      end: today,
+    );
+    return (done: s.done, scheduled: s.scheduled);
+  }
+
+  Widget _habitTile(Map<String, Object?> h, {required bool selected}) {
+    final id = h['id'] as String;
+    final title = h['title'] as String? ?? 'Habit';
+    final schedule = habitScheduleLabel(h['days_mask'] as String?);
+    final prog = _progress30(h);
+    final frac = prog.scheduled == 0
+        ? '—'
+        : '${prog.done}/${prog.scheduled}';
+
+    return Material(
+      color: selected ? BodylineColors.selectedWash : BodylineColors.surface,
+      borderRadius: BorderRadius.circular(BodylineRadii.card),
+      child: InkWell(
+        onTap: () => _openDetail(id),
+        borderRadius: BorderRadius.circular(BodylineRadii.card),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(BodylineRadii.card),
+            border: Border.all(
+              color: selected ? BodylineColors.teal : BodylineColors.border,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                habitIconFor(h),
+                size: 22,
+                color: BodylineColors.tealDark,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$schedule · $frac',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: BodylineColors.inkSubtle,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildList({required bool wide}) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_habits.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'No habits yet',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontFamily: 'Fraunces',
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Track daily check-ins on this device — not streaks or advice.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: BodylineColors.inkSubtle),
+              ),
+              if (!widget.embedded) ...[
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: promptAdd,
+                  icon: const Icon(Icons.add),
+                  label: const Text('New habit'),
+                ),
+              ],
+            ],
+          ),
+        ),
       );
     }
-    widget.onChanged();
-    await _load();
+
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: 8),
+      itemCount: _habits.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        final h = _habits[i];
+        final id = h['id'] as String;
+        final selected = wide && id == _selectedId;
+        if (wide) {
+          return _habitTile(h, selected: selected);
+        }
+        // Mobile: open detail — log via calendar / Update today.
+        final prog = _progress30(h);
+        final schedule = habitScheduleLabel(h['days_mask'] as String?);
+        final frac = prog.scheduled == 0
+            ? '—'
+            : '${prog.done}/${prog.scheduled}';
+        return Material(
+          color: BodylineColors.surface,
+          borderRadius: BorderRadius.circular(BodylineRadii.card),
+          child: ListTile(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(BodylineRadii.card),
+              side: BorderSide(color: BodylineColors.border),
+            ),
+            leading: Icon(habitIconFor(h), color: BodylineColors.tealDark),
+            onTap: () => _openDetail(id),
+            title: Text(
+              h['title'] as String? ?? 'Habit',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text('$schedule · $frac'),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 900 && widget.embedded;
-    final list = _loading
-        ? const Center(child: CircularProgressIndicator())
-        : _habits.isEmpty
-            ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(28),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'No habits yet',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontFamily: 'Fraunces',
-                            ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Track daily check-ins on this device — not streaks or advice.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: BodylineColors.inkSubtle),
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: promptAdd,
-                        icon: const Icon(Icons.add),
-                        label: const Text('New habit'),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : ListView.separated(
-                padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
-                itemCount: _habits.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, i) {
-                  final h = _habits[i];
-                  final id = h['id'] as String;
-                  final title = h['title'] as String? ?? 'Habit';
-                  final kind = (h['kind'] as String?) ?? 'yes_no';
-                  final goal = (h['goal_value'] as num?)?.toDouble();
-                  final log = _logs[id];
-                  final st = habitDayState(
-                    kind: kind,
-                    goalValue: goal,
-                    log: log,
-                  );
-                  final subtitle = switch (st) {
-                    'done' => 'Done today',
-                    'partial' => _partialLabel(kind, log, goal, h),
-                    _ => 'Not yet today',
-                  };
-                  final selected = wide && id == _selectedId;
-                  return Material(
-                    color: selected
-                        ? BodylineColors.tealTint
-                        : BodylineColors.surface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(BodylineRadii.cardSmall),
-                      side: BorderSide(
-                        color: selected
-                            ? BodylineColors.teal
-                            : BodylineColors.border,
-                      ),
-                    ),
-                    child: ListTile(
-                      onTap: () => _openDetail(id),
-                      title: Text(
-                        title,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text(subtitle),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (st == 'done')
-                            FilledButton.tonal(
-                              onPressed: () async {
-                                final pid = widget.store.activeProfileId;
-                                if (pid == null) return;
-                                await widget.store.setHabitProgress(
-                                  habitId: id,
-                                  profileId: pid,
-                                  loggedOnYmd: _ymd,
-                                  kind: kind,
-                                  goalValue: goal,
-                                  done: false,
-                                  value: 0,
-                                  loggedByProfileId: storeActorId(widget.store),
-                                );
-                                widget.onChanged();
-                                await _load();
-                              },
-                              child: const Text('Undo'),
-                            )
-                          else
-                            FilledButton(
-                              onPressed: () => _quickLog(h),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: BodylineColors.teal,
-                              ),
-                              child: Text(kind == 'yes_no' ? 'Mark done' : 'Log'),
-                            ),
-                          IconButton(
-                            tooltip: 'Delete',
-                            onPressed: () async {
-                              await widget.store.softDeleteHabit(id);
-                              await _load();
-                              widget.onChanged();
-                            },
-                            icon: const Icon(Icons.delete_outline),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              );
+    final wide = widget.embedded && useWideShell(context);
+    final list = _buildList(wide: wide);
 
     Widget body = list;
     if (wide) {
       final sel = _selectedId;
-      body = Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(width: 360, child: list),
-          const VerticalDivider(width: 1),
-          Expanded(
-            child: sel == null
-                ? Center(
-                    child: Text(
-                      'Select a habit',
-                      style: TextStyle(color: BodylineColors.inkSubtle),
+      final selectedHabit = sel == null
+          ? null
+          : _habits.cast<Map<String, Object?>?>().firstWhere(
+                (h) => h?['id'] == sel,
+                orElse: () => null,
+              );
+      final detail = sel == null
+          ? Center(
+              child: Text(
+                _habits.isEmpty
+                    ? 'Add a habit from + New habit to get started.'
+                    : 'Select a habit',
+                style: TextStyle(color: BodylineColors.inkSubtle),
+              ),
+            )
+          : HabitDetailScreen(
+              key: _detailKey,
+              store: widget.store,
+              habitId: sel,
+              embedded: true,
+              showSettingsInline: false,
+              onChanged: () {
+                widget.onChanged();
+                setState(() => _notesTick++);
+                _load();
+              },
+            );
+
+      final charts = selectedHabit == null
+          ? const <String>[]
+          : habitChartCodes(selectedHabit);
+
+      body = Padding(
+        padding: const EdgeInsets.fromLTRB(
+          DesktopLayout.mainPaddingH,
+          4,
+          DesktopLayout.mainPaddingH,
+          DesktopLayout.mainPaddingV,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: 280,
+              child: list,
+            ),
+            const SizedBox(width: DesktopLayout.mainGap),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
+                decoration: BoxDecoration(
+                  color: BodylineColors.surface,
+                  borderRadius: BorderRadius.circular(BodylineRadii.card),
+                  border: Border.all(color: BodylineColors.border),
+                ),
+                child: detail,
+              ),
+            ),
+            const SizedBox(width: DesktopLayout.mainGap),
+            SizedBox(
+              width: 260,
+              child: selectedHabit == null
+                  ? const SizedBox.shrink()
+                  : ListView(
+                      children: [
+                        HabitSettingsCard(
+                          habit: selectedHabit,
+                          profileName: _profileName,
+                          onEdit: () async {
+                            final ok = await showHabitEditor(
+                              context: context,
+                              store: widget.store,
+                              existing: selectedHabit,
+                            );
+                            if (ok) {
+                              widget.onChanged();
+                              await _load();
+                              await _detailKey.currentState?.reload();
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        HabitNotesCard(
+                          key: ValueKey('notes-$sel-$_notesTick'),
+                          store: widget.store,
+                          habit: selectedHabit,
+                          onChanged: () {
+                            widget.onChanged();
+                            setState(() => _notesTick++);
+                            _load();
+                            _detailKey.currentState?.reload();
+                          },
+                        ),
+                        if (charts.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          HabitTrendsCard(chartCodes: charts),
+                        ],
+                      ],
                     ),
-                  )
-                : HabitDetailScreen(
-                    key: ValueKey(sel),
-                    store: widget.store,
-                    habitId: sel,
-                    embedded: true,
-                    onChanged: () {
-                      widget.onChanged();
-                      _load();
-                    },
-                  ),
-          ),
-        ],
+            ),
+          ],
+        ),
       );
     }
 
@@ -296,30 +398,13 @@ class HabitsScreenState extends State<HabitsScreen> {
         icon: const Icon(Icons.add),
         label: const Text('New habit'),
       ),
-      body: body,
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: body,
+      ),
     );
-  }
-
-  String _partialLabel(
-    String kind,
-    Map<String, Object?>? log,
-    double? goal,
-    Map<String, Object?> h,
-  ) {
-    final v = (log?['value'] as num?)?.toDouble() ?? 0;
-    final unit = h['unit_label'] as String?;
-    final g = goal ?? 0;
-    final u = unit != null && unit.isNotEmpty
-        ? ' $unit'
-        : (kind == 'duration' ? ' min' : '');
-    if (g > 0) {
-      return '${v.toStringAsFixed(v == v.roundToDouble() ? 0 : 1)} of '
-          '${g.toStringAsFixed(g == g.roundToDouble() ? 0 : 1)}$u';
-    }
-    return '${v.toStringAsFixed(0)}$u today';
   }
 }
 
 /// Active profile is the actor when logging for someone else later.
-String storeActorId(LocalStore store) =>
-    store.activeProfileId ?? '';
+String storeActorId(LocalStore store) => store.activeProfileId ?? '';

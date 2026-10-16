@@ -21,8 +21,9 @@ import '../../widgets/trend_panel.dart';
 import '../presenter/presenter_setup_screen.dart';
 import '../visits/care_screen.dart';
 import '../visits/reminders_screen.dart';
+import '../today/habits_screen.dart';
 import '../today/today_screen.dart';
-import '../insights/patterns_screen.dart';
+import '../records/notes_screen.dart';
 import '../medicines/medicines_screen.dart';
 import '../medicines/dose_wait_screen.dart';
 import '../medicines/dose_wait_controller.dart';
@@ -185,46 +186,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 
-  Widget _todayPatternsRow(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => TodayScreen(
-                      store: widget.store,
-                      onChanged: widget.onChanged,
-                    ),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.today_outlined),
-              label: const Text('Today'),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => PatternsScreen(store: widget.store),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.insights_outlined),
-              label: const Text('Patterns'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     BodylineColors.syncFrom(context);
@@ -235,7 +196,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildMobile(BuildContext context) {
     final profile = _profile;
     final needs = _needsAttention;
-    final latest = _latestDate;
     final initial = (profile?.name.isNotEmpty == true)
         ? profile!.name[0].toUpperCase()
         : '?';
@@ -244,7 +204,6 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
         children: [
-          _todayPatternsRow(context),
           Row(
             children: [
               Expanded(
@@ -323,7 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          _yourBodyCard(latest, mapBesideList: true),
+          _yourBodyImageCard(),
           const SizedBox(height: 16),
           _careShortcuts(),
           const SizedBox(height: 12),
@@ -342,16 +301,59 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _careShortcuts() {
     final items = <({IconData icon, String label, VoidCallback onTap})>[
       (
-        icon: Icons.event_note_outlined,
-        label: 'Visit',
+        icon: Icons.today_outlined,
+        label: 'Today',
         onTap: () => _openCarePage(
-          CareScreen(
+          TodayScreen(
             store: widget.store,
             onChanged: () {
               widget.onChanged();
               _load();
             },
-            includeReminders: false,
+            onOpenHabits: () => _openCarePage(
+              HabitsScreen(
+                store: widget.store,
+                onChanged: () {
+                  widget.onChanged();
+                  _load();
+                },
+              ),
+            ),
+            onOpenMedicines: () => _openCarePage(
+              MedicinesScreen(
+                store: widget.store,
+                onChanged: () {
+                  widget.onChanged();
+                  _load();
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+      (
+        icon: Icons.check_circle_outline,
+        label: 'Habits',
+        onTap: () => _openCarePage(
+          HabitsScreen(
+            store: widget.store,
+            onChanged: () {
+              widget.onChanged();
+              _load();
+            },
+          ),
+        ),
+      ),
+      (
+        icon: Icons.sticky_note_2_outlined,
+        label: 'Notes',
+        onTap: () => _openCarePage(
+          NotesScreen(
+            store: widget.store,
+            onChanged: () {
+              widget.onChanged();
+              _load();
+            },
           ),
         ),
       ),
@@ -369,15 +371,16 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       (
-        icon: Icons.notifications_none,
-        label: 'Reminder',
+        icon: Icons.event_note_outlined,
+        label: 'Visit',
         onTap: () => _openCarePage(
-          RemindersScreen(
+          CareScreen(
             store: widget.store,
             onChanged: () {
               widget.onChanged();
               _load();
             },
+            includeReminders: false,
           ),
         ),
       ),
@@ -408,31 +411,37 @@ class _HomeScreenState extends State<HomeScreen> {
           const DoseWaitScreen(mode: DoseWaitMode.stopwatch),
         ),
       ),
+      (
+        icon: Icons.notifications_none,
+        label: 'Reminder',
+        onTap: () => _openCarePage(
+          RemindersScreen(
+            store: widget.store,
+            onChanged: () {
+              widget.onChanged();
+              _load();
+            },
+          ),
+        ),
+      ),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Care',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            for (final item in items.take(3))
-              Expanded(child: _careShortcutTile(item.icon, item.label, item.onTap)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            for (final item in items.skip(3))
-              Expanded(child: _careShortcutTile(item.icon, item.label, item.onTap)),
-          ],
-        ),
+        for (var i = 0; i < items.length; i += 3) ...[
+          if (i > 0) const SizedBox(height: 8),
+          Row(
+            children: [
+              for (final item in items.skip(i).take(3))
+                Expanded(
+                  child: _careShortcutTile(item.icon, item.label, item.onTap),
+                ),
+              for (var pad = items.skip(i).take(3).length; pad < 3; pad++)
+                const Expanded(child: SizedBox.shrink()),
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -970,6 +979,62 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openBodySystems() {
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute(
+            builder: (_) => _BodySystemsPage(
+              store: widget.store,
+              desktop: widget.desktop,
+              onChanged: widget.onChanged,
+            ),
+          ),
+        )
+        .then((_) {
+      if (mounted) _load();
+    });
+  }
+
+  Widget _yourBodyImageCard() {
+    final mapFlags = _bodyPrefs.mapFlags(_flags);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      decoration: BoxDecoration(
+        color: BodylineColors.surface,
+        borderRadius: BorderRadius.circular(BodylineRadii.card),
+        border: Border.all(color: BodylineColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Your body',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+          ),
+          const SizedBox(height: 4),
+          InkWell(
+            onTap: _openBodySystems,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: BodyMapView(
+                  flags: mapFlags,
+                  width: 220,
+                  height: 360,
+                  sex: _profile?.sex,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _yourBodyCard(DateTime? latest, {required bool mapBesideList}) {
     final mapFlags = _bodyPrefs.mapFlags(_flags);
     final list = Column(
@@ -1019,14 +1084,14 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                BodyMapView(flags: mapFlags, width: 180, height: 300),
+                BodyMapView(flags: mapFlags, width: 180, height: 300, sex: _profile?.sex),
                 const SizedBox(width: 12),
                 Expanded(child: list),
               ],
             )
           else ...[
             Center(
-              child: BodyMapView(flags: mapFlags, width: 180, height: 300),
+              child: BodyMapView(flags: mapFlags, width: 180, height: 300, sex: _profile?.sex),
             ),
             const SizedBox(height: 10),
             Expanded(
@@ -1068,6 +1133,130 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
   Widget _organRow(OrganSummary organ) {
+    return _OrganStatusRow(
+      organ: organ,
+      onOpen: () {
+        Navigator.of(context)
+            .push(
+              MaterialPageRoute(
+                builder: (_) => OrganDetailScreen(
+                  store: widget.store,
+                  systemCode: organ.code,
+                  desktop: widget.desktop,
+                ),
+              ),
+            )
+            .then((_) => _load());
+      },
+    );
+  }
+
+}
+
+class _BodySystemsPage extends StatefulWidget {
+  const _BodySystemsPage({
+    required this.store,
+    required this.desktop,
+    required this.onChanged,
+  });
+
+  final LocalStore store;
+  final bool desktop;
+  final VoidCallback onChanged;
+
+  @override
+  State<_BodySystemsPage> createState() => _BodySystemsPageState();
+}
+
+class _BodySystemsPageState extends State<_BodySystemsPage> {
+  List<OrganSummary> _all = [];
+  List<OrganSummary> _organs = [];
+  BodyPanelPrefs _prefs = BodyPanelPrefs(order: const [], hidden: {});
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final organs = await widget.store.organSummaries();
+    final prefs = await BodyPanelPrefs.load(
+      profileId: widget.store.activeProfileId,
+      catalogCodes: [for (final o in organs) o.code],
+    );
+    if (!mounted) return;
+    setState(() {
+      _all = organs;
+      _prefs = prefs;
+      _organs = prefs.applyToSummaries(organs, codeOf: (o) => o.code);
+    });
+  }
+
+  Future<void> _customize() async {
+    final next = await showCustomizeBodySheet(
+      context: context,
+      prefs: _prefs,
+      allOrgans: _all,
+    );
+    if (next == null || !mounted) return;
+    final pid = widget.store.activeProfileId;
+    if (pid != null) await next.save(pid);
+    setState(() {
+      _prefs = next;
+      _organs = next.applyToSummaries(_all, codeOf: (o) => o.code);
+    });
+    widget.onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: BodylineColors.paper,
+      appBar: AppBar(
+        title: const Text('Your body'),
+        actions: [
+          IconButton(
+            tooltip: 'Customize',
+            onPressed: _customize,
+            icon: const Icon(Icons.tune),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
+        children: [
+          for (final organ in _organs)
+            _OrganStatusRow(
+              organ: organ,
+              onOpen: () {
+                Navigator.of(context)
+                    .push(
+                      MaterialPageRoute(
+                        builder: (_) => OrganDetailScreen(
+                          store: widget.store,
+                          systemCode: organ.code,
+                          desktop: widget.desktop,
+                        ),
+                      ),
+                    )
+                    .then((_) => _load());
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrganStatusRow extends StatelessWidget {
+  const _OrganStatusRow({required this.organ, required this.onOpen});
+
+  final OrganSummary organ;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
     final color = switch (organ.flag) {
       null => BodylineColors.untested,
       ObservationFlag.normal => BodylineColors.teal,
@@ -1088,19 +1277,7 @@ class _HomeScreenState extends State<HomeScreen> {
     };
 
     return InkWell(
-      onTap: () {
-        Navigator.of(context)
-            .push(
-              MaterialPageRoute(
-                builder: (_) => OrganDetailScreen(
-                  store: widget.store,
-                  systemCode: organ.code,
-                  desktop: widget.desktop,
-                ),
-              ),
-            )
-            .then((_) => _load());
-      },
+      onTap: onOpen,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
@@ -1177,5 +1354,4 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
 }

@@ -78,7 +78,7 @@ class _HealthConnectScreenState extends State<HealthConnectScreen> {
       case HealthBridgeStatus.needsAuth:
         return 'Permission expired or incomplete. Connect again.';
       case HealthBridgeStatus.connected:
-        return 'Connected. Import pulls weight, glucose, and blood pressure.';
+        return 'Connected. Import pulls weight, glucose, blood pressure, steps, and sleep duration.';
     }
   }
 
@@ -163,7 +163,7 @@ class _HealthConnectScreenState extends State<HealthConnectScreen> {
               contentPadding: EdgeInsets.zero,
               title: const Text('Write new readings back'),
               subtitle: Text(
-                'When you enter weight or glucose in Vitalog, also save to '
+                'When you enter weight, glucose, steps, or sleep in Vitalog, also save to '
                 '${_hc.platformLabel}.',
               ),
               value: _write,

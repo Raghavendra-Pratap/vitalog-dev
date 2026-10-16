@@ -1,3 +1,4 @@
+import 'package:bodyline_core/bodyline_core.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -19,6 +20,7 @@ import 'ocr_normalize.dart';
 class OcrService {
   OcrService({ImagePicker? picker}) : _picker = picker ?? ImagePicker();
   final ImagePicker _picker;
+  List<WordBox> _lastWordBoxes = const [];
 
   static const int _maxLongEdge = 2000;
   static const int _jpegQuality = 85;
@@ -42,6 +44,16 @@ class OcrService {
   /// Prefer [recognizeXFile] — picker paths are not always ML Kit-readable.
   Future<String?> recognizeFile(String path) =>
       recognizeXFile(XFile(path));
+
+
+  /// Same as [recognizeXFile] but also returns WordBoxes when ML Kit has bounds.
+  Future<OcrExtractResult?> recognizeXFileDetailed(XFile file) async {
+    final text = await recognizeXFile(file);
+    if (text == null || text.trim().isEmpty) return null;
+    // Re-run layout path is expensive; stash last boxes via side channel.
+    final boxes = List<WordBox>.from(_lastWordBoxes);
+    return OcrExtractResult(text: text, boxes: boxes);
+  }
 
   Future<String?> recognizeXFile(XFile file) async {
     if (!isSupported) {
@@ -181,9 +193,12 @@ class OcrService {
     }
     String raw;
     if (boxes.isNotEmpty) {
-      raw = layoutOcrByGeometry(boxes);
+      // Prefer WordBox layout rebuild (FR-013); legacy stitch if sparse.
+      raw = layoutTextFromOcrBoxes(boxes);
+      _lastWordBoxes = wordBoxesFromOcrBoxes(boxes);
     } else {
       raw = result.text.trim();
+      _lastWordBoxes = const [];
     }
     return raw.isEmpty ? null : raw;
   }

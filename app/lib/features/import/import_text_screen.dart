@@ -14,6 +14,7 @@ import 'ocr_layout.dart';
 import 'ocr_normalize.dart';
 import 'ocr_service.dart';
 import 'lab_report_date.dart';
+import 'package:bodyline_core/bodyline_core.dart';
 import 'pdf_text.dart';
 
 class _ImportMatch {
@@ -93,6 +94,7 @@ class ImportTextScreen extends StatefulWidget {
 
 class _ImportTextScreenState extends State<ImportTextScreen> {
   final _text = TextEditingController();
+  List<WordBox>? _lastBoxes;
   final _title = TextEditingController(text: 'Imported report');
   final _ocr = OcrService();
   List<_ImportMatch> _rows = [];
@@ -149,11 +151,13 @@ class _ImportTextScreenState extends State<ImportTextScreen> {
       _ocrNote = 'Reading PDF text…';
     });
     try {
-      final text = await extractPdfTextInteractive(
+      final extracted = await extractPdfResultInteractive(
         context,
         path: path,
         bytes: bytes,
       );
+      final text = extracted?.text;
+      _lastBoxes = extracted?.boxes;
       if (!mounted) return;
       if (text == null || text.trim().isEmpty) {
         final encrypted = await pdfLooksEncrypted(path, bytes: bytes);
@@ -216,7 +220,9 @@ class _ImportTextScreenState extends State<ImportTextScreen> {
       _ocrNote = 'Reading text on this device…';
     });
     try {
-      final text = await _ocr.recognizeXFile(file);
+      final detailed = await _ocr.recognizeXFileDetailed(file);
+      final text = detailed?.text;
+      _lastBoxes = detailed?.boxes;
       if (!mounted) return;
       if (text == null || text.trim().isEmpty) {
         setState(() {
@@ -254,7 +260,16 @@ class _ImportTextScreenState extends State<ImportTextScreen> {
   Future<void> _parse() async {
     setState(() => _busy = true);
     final rows =
-        await widget.store.parseLabText(normalizeOcrLabText(_text.text), bandsSource: _text.text);
+        (_lastBoxes != null && _lastBoxes!.length >= 4)
+            ? await widget.store.parseLabFromBoxes(
+                _lastBoxes!,
+                bandsSource: _text.text,
+                textFallback: _text.text,
+              )
+            : await widget.store.parseLabText(
+                normalizeOcrLabText(_text.text),
+                bandsSource: _text.text,
+              );
     if (!mounted) return;
     final footerOnly =
         rows.isEmpty && ocrLooksLikeFooterWithoutResults(_text.text);
@@ -300,25 +315,57 @@ class _ImportTextScreenState extends State<ImportTextScreen> {
     final pid = widget.store.activeProfileId;
     if (pid == null || _includedCount == 0) return;
     final dates = parseLabReportDates(_text.text);
-    await widget.store.addManualPanel(
-      profileId: pid,
-      title: _title.text.trim().isEmpty ? 'Imported report' : _title.text.trim(),
-      collectedAt: dates.effective,
-      values: [
-        for (final r in _rows)
-          if (r.kept)
-            ManualObservationInput(
-              parameterCode: r.parameterCode,
-              parameterName: r.parameterName,
-              valueReported: r.valueReported,
-              unitReported: r.unitReported,
-              refLow: r.refs.snapshot().low,
-              refHigh: r.refs.snapshot().high,
-              refBands: r.refs.snapshot().bands,
-            ),
-      ],
+    final custom = _title.text.trim();
+    final useCustom =
+        custom.isNotEmpty && custom.toLowerCase() != 'imported report';
+    final kept = [for (final r in _rows) if (r.kept) r];
+    final groups = await widget.store.groupParameterCodesByPanel(
+      kept.map((r) => r.parameterCode),
     );
+    final byCode = <String, List<_ImportMatch>>{};
+    for (final r in kept) {
+      (byCode[r.parameterCode] ??= []).add(r);
+    }
+    final seen = <String>{};
+    var saved = 0;
+    for (final g in groups) {
+      final values = <ManualObservationInput>[];
+      for (final code in g.parameterCodes) {
+        if (!seen.add(code)) continue;
+        final matches = byCode[code];
+        if (matches == null || matches.isEmpty) continue;
+        final r = matches.first;
+        values.add(
+          ManualObservationInput(
+            parameterCode: r.parameterCode,
+            parameterName: r.parameterName,
+            valueReported: r.valueReported,
+            unitReported: r.unitReported,
+            refLow: r.refs.snapshot().low,
+            refHigh: r.refs.snapshot().high,
+            refBands: r.refs.snapshot().bands,
+          ),
+        );
+      }
+      if (values.isEmpty) continue;
+      final title = useCustom ? '$custom · ${g.panelName}' : g.panelName;
+      final report = await widget.store.addManualPanel(
+        profileId: pid,
+        title: title,
+        collectedAt: dates.effective,
+        values: values,
+        source: 'import',
+      );
+      if (report != null) saved++;
+    }
     if (!mounted) return;
+    if (saved > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(saved == 1 ? 'Saved 1 panel' : 'Saved $saved panels'),
+        ),
+      );
+    }
     widget.onSaved();
     Navigator.of(context).pop();
   }

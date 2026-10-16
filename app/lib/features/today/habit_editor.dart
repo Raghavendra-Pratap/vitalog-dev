@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 
 import '../../data/habits_notes_store.dart';
 import '../../data/local_store.dart';
+import '../../notifications/reminder_notifications.dart';
 import '../../theme/tokens.dart';
+import '../../widgets/chart_link_picker.dart';
 
-/// Add / edit habit dialog fields matching daily-health mockups (non-med templates).
+/// Add / edit habit dialog — lifestyle templates only (dosing lives on Medicines).
 Future<bool> showHabitEditor({
   required BuildContext context,
   required LocalStore store,
@@ -39,10 +41,63 @@ Future<bool> showHabitEditor({
   final reminderCtrl = TextEditingController(
     text: existing?['reminder_hm'] as String? ?? '08:00',
   );
-  final chartsCtrl = TextEditingController(
-    text: habitChartCodes(existing ?? {}).join(', '),
-  );
   String? templateKey = existing?['template_key'] as String?;
+
+  // code → display name for suggestions (observations + catalogue).
+  final codeToName = <String, String>{};
+  for (final o in store.observations) {
+    if (o.deleted) continue;
+    if (o.profileId != profileId && forceProfileId == null) {
+      // Still include active-profile rows primarily; allow all for linking.
+    }
+    if (o.parameterCode.isNotEmpty) {
+      codeToName[o.parameterCode] = o.parameterName.isNotEmpty
+          ? o.parameterName
+          : o.parameterCode;
+    }
+  }
+  try {
+    final panels = await store.catalogPanels();
+    for (final panel in panels) {
+      for (final p in panel.parameters) {
+        codeToName.putIfAbsent(
+          p.code,
+          () => p.name.isNotEmpty ? p.name : p.code,
+        );
+      }
+    }
+  } catch (_) {}
+
+  String labelFor(String code) => codeToName[code] ?? code;
+
+  /// Resolve legacy free-text entries (names) to catalogue codes when possible.
+  String? resolveChartToken(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty || t == kChartCodeAll) return null;
+    if (codeToName.containsKey(t)) return t;
+    final lower = t.toLowerCase();
+    for (final e in codeToName.entries) {
+      if (e.key.toLowerCase() == lower || e.value.toLowerCase() == lower) {
+        return e.key;
+      }
+    }
+    // Keep unknown token so user data is not silently dropped.
+    codeToName.putIfAbsent(t, () => t);
+    return t;
+  }
+
+  final existingCharts = habitChartCodes(existing ?? {});
+  var showOnAllCharts = chartCodesAreAll(existingCharts);
+  var selectedCharts = <String>{
+    for (final c in existingCharts)
+      if (c != kChartCodeAll)
+        if (resolveChartToken(c) != null) resolveChartToken(c)!,
+  };
+
+  final chartOptions = codeToName.keys.toList()
+    ..sort(
+      (a, b) => labelFor(a).toLowerCase().compareTo(labelFor(b).toLowerCase()),
+    );
 
   final ok = await showDialog<bool>(
     context: context,
@@ -80,7 +135,7 @@ Future<bool> showHabitEditor({
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      for (final t in habitTemplates)
+                      for (final t in habitTemplatesFor('lifestyle'))
                         ActionChip(
                           label: Text(t['title']!),
                           onPressed: () => applyTemplate(t),
@@ -91,7 +146,8 @@ Future<bool> showHabitEditor({
                   if (profiles.length > 1) ...[
                     DropdownButtonFormField<String>(
                       value: profileId,
-                      decoration: const InputDecoration(labelText: 'Who it is for'),
+                      decoration:
+                          const InputDecoration(labelText: 'Who it is for'),
                       items: [
                         for (final p in profiles)
                           DropdownMenuItem(value: p.id, child: Text(p.name)),
@@ -134,13 +190,18 @@ Future<bool> showHabitEditor({
                           child: TextField(
                             controller: goalCtrl,
                             decoration: InputDecoration(
-                              labelText: kind == 'duration' ? 'Goal (minutes)' : 'Goal',
+                              labelText: kind == 'duration'
+                                  ? 'Goal (minutes)'
+                                  : 'Goal',
                             ),
-                            keyboardType: const TextInputType.numberWithOptions(
+                            keyboardType:
+                                const TextInputType.numberWithOptions(
                               decimal: true,
                             ),
                             inputFormatters: [
-                              FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'[0-9.]'),
+                              ),
                             ],
                           ),
                         ),
@@ -174,7 +235,8 @@ Future<bool> showHabitEditor({
                         FilterChip(
                           label: Text(['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]),
                           selected: days[i] == '1',
-                          onSelected: (v) => setLocal(() => days[i] = v ? '1' : '0'),
+                          onSelected: (v) =>
+                              setLocal(() => days[i] = v ? '1' : '0'),
                         ),
                     ],
                   ),
@@ -194,15 +256,57 @@ Future<bool> showHabitEditor({
                       ),
                     ),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: chartsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Show on charts (optional)',
-                      hintText: 'e.g. HbA1c, glucose',
-                      helperText:
-                          'Parameter codes, comma-separated. Shown beside trends — not cause and effect.',
+                  Text(
+                    'Show on charts',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: BodylineColors.inkSubtle,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('All charts'),
+                    subtitle: const Text(
+                      'Pins this habit on every trend — for context, not cause and effect.',
+                    ),
+                    value: showOnAllCharts,
+                    onChanged: (v) => setLocal(() {
+                      showOnAllCharts = v;
+                      if (v) selectedCharts.clear();
+                    }),
+                  ),
+                  if (!showOnAllCharts) ...[
+                    Text(
+                      selectedCharts.isEmpty
+                          ? 'Search and add a chart'
+                          : 'Shows on ${selectedCharts.length} chart${selectedCharts.length == 1 ? '' : 's'}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: BodylineColors.inkSubtle,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ChartLinkPicker(
+                      options: chartOptions,
+                      selected: selectedCharts,
+                      labelFor: labelFor,
+                      hintText: 'Search tests to add…',
+                      onChanged: (next) => setLocal(() {
+                        selectedCharts
+                          ..clear()
+                          ..addAll(next);
+                      }),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Shown beside trends — not cause and effect.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: BodylineColors.inkSubtle,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -227,17 +331,14 @@ Future<bool> showHabitEditor({
     goalCtrl.dispose();
     unitCtrl.dispose();
     reminderCtrl.dispose();
-    chartsCtrl.dispose();
     return false;
   }
 
   final goal = double.tryParse(goalCtrl.text.trim());
   final mask = days.join();
-  final charts = chartsCtrl.text
-      .split(',')
-      .map((e) => e.trim())
-      .where((e) => e.isNotEmpty)
-      .toList();
+  final charts = showOnAllCharts
+      ? const [kChartCodeAll]
+      : selectedCharts.toList();
   final hm = reminder ? reminderCtrl.text.trim() : null;
 
   if (existing == null) {
@@ -271,6 +372,12 @@ Future<bool> showHabitEditor({
   goalCtrl.dispose();
   unitCtrl.dispose();
   reminderCtrl.dispose();
-  chartsCtrl.dispose();
+
+  try {
+    final all = await store.listAllHabits();
+    await ReminderNotifications.instance.ensurePermission();
+    await ReminderNotifications.instance.rescheduleAllHabits(all);
+  } catch (_) {}
+
   return true;
 }

@@ -42,7 +42,6 @@ class RemindersScreenState extends State<RemindersScreen> {
   @override
   void initState() {
     super.initState();
-    DoseWaitController.instance.addListener(_onWait);
     _load();
   }
 
@@ -52,17 +51,17 @@ class RemindersScreenState extends State<RemindersScreen> {
     _load();
   }
 
-  @override
-  void dispose() {
-    DoseWaitController.instance.removeListener(_onWait);
-    super.dispose();
-  }
-
-  void _onWait() {
-    if (mounted) setState(() {});
-  }
-
   Future<void> promptAdd() => _add();
+
+  /// Select Timer or Stopwatch detail pane (desktop header chip).
+  void openTool(DoseWaitMode mode) {
+    setState(() {
+      _pane = mode == DoseWaitMode.countdown
+          ? _RightPane.timer
+          : _RightPane.stopwatch;
+      _selectedReminderId = null;
+    });
+  }
 
   Future<void> _load() async {
     final gen = ++_loadGen;

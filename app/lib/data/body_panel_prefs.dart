@@ -17,15 +17,24 @@ class BodyPanelPrefs {
 
   static const _skip = {'endocrine'};
 
-  /// Systems that have a dedicated silhouette glyph.
+  /// Systems that have a dedicated silhouette on the v2 body map.
+  /// Source: assets/brand/vitalog-body-map-organs.html
   static const glyphCodes = {
-    'thyroid',
+    'general',
+    'lungs',
+    'bones',
+    'blood',
     'heart',
     'liver',
-    'kidney',
-    'lungs',
+    'immune',
     'pancreas',
-    'bone',
+    'kidney',
+    'adrenal',
+    'thyroid',
+    'parathyroid',
+    'pituitary',
+    'prostate',
+    'reproductive',
   };
 
   static String _key(String profileId) => 'body_panel_prefs_$profileId';

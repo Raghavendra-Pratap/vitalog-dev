@@ -1,0 +1,315 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>vitalog Body Map Organs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: figure on the left (sticky on wide screens), system controls on the right, developer export below */
+:root{
+  --paper:#F6F4EF; --card:#FFFDF8; --ink:#1C2230; --mute:#6B675E; --line:#E2DDD2; --soft:#ECE8DF;
+  --ok:#0E6B63; --high:#B8561B; --low:#2A5CA0; --untested:#D6CBBD;
+  --body:#EDE3D8; --body-shadow:#E3DBCF; --stage:#FBF8F2;
+  --display:'Fraunces',Georgia,serif; --sans:'Manrope',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#15181F; --card:#1D2129; --ink:#ECE9E2; --mute:#A39E93; --line:#2E333D; --soft:#262B34; --stage:#1A1E25; color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#15181F; --card:#1D2129; --ink:#ECE9E2; --mute:#A39E93; --line:#2E333D; --soft:#262B34; --stage:#1A1E25; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5;padding-inline:20px;padding-block:0 64px}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:32px}
+header{padding-top:36px;display:flex;flex-direction:column;gap:10px}
+.eyebrow{color:var(--ok);font-weight:700;font-size:12px;letter-spacing:.1em;text-transform:uppercase}
+h1{font-family:var(--display);font-weight:600;font-size:clamp(28px,4.5vw,42px);line-height:1.1;margin:0;text-wrap:balance}
+h2{font-family:var(--display);font-weight:600;font-size:24px;margin:0}
+.lede{color:var(--mute);max-width:68ch;margin:0}
+.main{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:28px;align-items:start}
+@media (max-width:860px){.main{grid-template-columns:minmax(0,1fr)}}
+.figure{position:sticky;top:16px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:12px}
+@media (max-width:860px){.figure{position:static}}
+.stage{background:var(--stage);border-radius:14px;display:flex;justify-content:center;padding:8px 0}
+.stage svg{width:100%;max-width:330px;height:auto;display:block}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.seg{display:inline-flex;padding:3px;border-radius:12px;background:var(--soft);gap:2px}
+.seg button{font:inherit;font-size:13px;font-weight:700;border:none;background:transparent;color:var(--mute);padding:6px 12px;border-radius:9px;cursor:pointer;min-height:34px}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.seg button:focus-visible,.sys button:focus-visible,.btn:focus-visible{outline:2px solid var(--ok);outline-offset:2px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mute)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:12px;height:12px;border-radius:4px;display:inline-block}
+.focus{min-height:44px;font-size:14px;color:var(--mute);border-top:1px solid var(--line);padding-top:10px}
+.focus b{color:var(--ink)}
+.list{display:flex;flex-direction:column;gap:8px}
+.sys{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;align-items:center}
+.sys.hl{border-color:var(--ink)}
+.sys .name{display:flex;flex-direction:column;min-width:0}
+.sys .name b{font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sys .name small{color:var(--mute);font-size:12.5px}
+.new{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--high);background:color-mix(in srgb,var(--high) 14%,transparent);padding:2px 7px;border-radius:6px}
+.sys .seg button{padding:5px 9px;font-size:12px;min-height:32px}
+.st-ok[aria-pressed="true"]{color:var(--ok)!important}.st-high[aria-pressed="true"]{color:var(--high)!important}.st-low[aria-pressed="true"]{color:var(--low)!important}
+.sys.off{opacity:.5}
+@media (max-width:520px){.sys{grid-template-columns:minmax(0,1fr)}}
+.dev{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px}
+.tablebox{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute)}
+code{font-family:var(--mono);font-size:12.5px}
+.btn{font:inherit;font-weight:700;font-size:14px;border-radius:22px;padding:10px 18px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;min-height:44px}
+.btn.dark{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+textarea{width:100%;min-height:160px;font-family:var(--mono);font-size:12px;border-radius:12px;border:1px solid var(--line);background:var(--stage);color:var(--ink);padding:10px}
+.toast{font-size:13px;color:var(--ok);font-weight:700;min-height:20px}
+ul.rules{margin:0;padding-left:20px;color:var(--ink)}ul.rules li{margin:4px 0}
+/* organ states (shared by the page and the exported SVG) */
+.organ .s{fill:var(--untested);transition:fill .2s}
+.organ .ln{stroke:var(--untested);fill:none}
+.organ.ok .s{fill:var(--ok)}.organ.ok .ln{stroke:var(--ok)}
+.organ.high .s{fill:var(--high)}.organ.high .ln{stroke:var(--high)}
+.organ.low .s{fill:var(--low)}.organ.low .ln{stroke:var(--low)}
+.organ .halo{opacity:0;fill:var(--high)}
+.organ.high .halo{opacity:.16;fill:var(--high)}.organ.low .halo{opacity:.16;fill:var(--low)}
+.organ.off,.organ.hidden-sex{display:none}
+.organ{cursor:pointer}
+.organ.hl .s{stroke:var(--ink);stroke-width:.8}
+.organ.hl .ln{stroke-width:2.6}
+#sys-general .ln{stroke-width:1.1;stroke-dasharray:3 2.2}
+#sys-general.ok .ln{stroke-dasharray:none}
+@media (prefers-reduced-motion:reduce){.organ .s{transition:none}}
+</style>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow">vitalog · body map</span>
+  <h1>Every body system, on the figure</h1>
+  <p class="lede">The nine systems that were list-only now have a shape. Set each one to in range, high, low or not tested to see how the figure reads, switch between the male and female figure, then copy the SVG for the app. Colours follow the app's rule: never red and green. High is orange, low is blue, in range is teal, always with a text label.</p>
+</header>
+
+<div class="main">
+  <section class="figure" aria-label="Body figure">
+    <div class="row">
+      <div class="seg" role="group" aria-label="Figure">
+        <button type="button" id="sex-m" aria-pressed="true">Male</button>
+        <button type="button" id="sex-f" aria-pressed="false">Female</button>
+      </div>
+      <div class="seg" role="group" aria-label="Preset">
+        <button type="button" id="pre-demo" aria-pressed="true">Sample results</button>
+        <button type="button" id="pre-new" aria-pressed="false">Only new</button>
+      </div>
+    </div>
+    <div class="stage" id="stage"></div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--ok)"></i>In range</span>
+      <span><i class="dot" style="background:var(--high)"></i>High</span>
+      <span><i class="dot" style="background:var(--low)"></i>Low</span>
+      <span><i class="dot" style="background:var(--untested)"></i>Not tested</span>
+    </div>
+    <div class="focus" id="focus" aria-live="polite">Tap a shape or a row to see what it stands for.</div>
+  </section>
+
+  <section aria-label="Body systems">
+    <div class="list" id="list"></div>
+  </section>
+</div>
+
+<section class="dev">
+  <h2>For developers</h2>
+  <p class="lede">One SVG in the same 180 × 300 coordinate space as the original body-map mockup. Each system is a group with the id <code>sys-&lt;system_code&gt;</code> (codes from <code>system_info</code> in <code>catalog.db</code>). Set its class to <code>ok</code>, <code>high</code>, <code>low</code> or nothing (not tested), or <code>off</code> when the user hides it in Customize body panel. Shapes marked <code>data-sex</code> show only for that sex.</p>
+  <ul class="rules">
+    <li>Fill parts carry class <code>s</code>; line parts (veins, outline, links) carry class <code>ln</code> and take the colour as a stroke.</li>
+    <li>High and low get a soft halo (<code>.halo</code>) so a flagged organ is found at a glance, as the heart already does.</li>
+    <li>Tiny organs (pituitary, parathyroid, adrenal, lymph nodes) are too small to tap reliably. Make the tap target at least 44 px around them, or open the list row instead.</li>
+    <li>The shapes are simple symbols, not anatomy. They follow the existing style: flat fills, no outlines.</li>
+  </ul>
+  <div class="tablebox"><table>
+    <thead><tr><th>System</th><th>Element</th><th>Shape</th><th>Key tests</th></tr></thead>
+    <tbody id="devtable"></tbody>
+  </table></div>
+  <div class="row"><button type="button" class="btn dark" id="copy">Copy SVG</button><span class="toast" id="toast"></span></div>
+  <label for="svgout" style="font-size:13px;color:var(--mute)">SVG with the states shown above</label>
+  <textarea id="svgout" readonly></textarea>
+</section>
+</div>
+
+<script>
+const SYS = [
+ {code:'heart', name:'Heart & circulation', shape:'Heart', tests:'LDL, HDL, triglycerides, hs-CRP, BP', isNew:false},
+ {code:'lungs', name:'Lungs', shape:'Two lobes behind the heart', tests:'SpO₂, breathing rate', isNew:false},
+ {code:'liver', name:'Liver', shape:'Liver, upper right of the body', tests:'ALT, AST, GGT, ALP, bilirubin, albumin', isNew:false},
+ {code:'pancreas', name:'Pancreas & blood sugar', shape:'Pancreas, below the liver', tests:'HbA1c, fasting and post-meal glucose, insulin, lipase', isNew:false},
+ {code:'kidney', name:'Kidneys', shape:'Two kidneys', tests:'Creatinine, eGFR, urine ACR, urea, potassium', isNew:false},
+ {code:'thyroid', name:'Thyroid', shape:'Butterfly at the neck', tests:'TSH, free T4, free T3, anti-TPO', isNew:false},
+ {code:'pituitary', name:'Pituitary', shape:'Small gland in the centre of the head', tests:'TSH, prolactin, FSH, LH', isNew:true},
+ {code:'parathyroid', name:'Parathyroid', shape:'Four small dots at the thyroid corners', tests:'PTH, calcium, vitamin D, phosphorus', isNew:true},
+ {code:'adrenal', name:'Adrenal', shape:'Small caps on top of each kidney', tests:'Cortisol, DHEA-S, sodium, potassium', isNew:true},
+ {code:'blood', name:'Blood', shape:'Veins on both forearms, where blood is drawn', tests:'Haemoglobin, WBC, platelets, ferritin, B12', isNew:true},
+ {code:'bones', name:'Bones & minerals', shape:'Upper arm and thigh bones', tests:'Vitamin D, calcium, phosphorus, ALP, PTH', isNew:true},
+ {code:'immune', name:'Immune & infection', shape:'Lymph nodes (neck, armpits, groin) and the spleen', tests:'CRP, ESR, ANA, RA factor, IgE', isNew:true},
+ {code:'prostate', name:'Prostate', shape:'Small gland in the pelvis (male figure)', tests:'PSA, free PSA', isNew:true, sex:'m'},
+ {code:'reproductive', name:'Reproductive', shape:'Uterus and ovaries, or testes, by figure', tests:'FSH, LH, estradiol, AMH, testosterone, β-hCG', isNew:true},
+ {code:'general', name:'General', shape:'Outline of the whole body', tests:'Weight, BMI, waist, temperature', isNew:true},
+];
+const DEMO = {heart:'high',lungs:'',liver:'high',pancreas:'ok',kidney:'high',thyroid:'high',pituitary:'',parathyroid:'ok',adrenal:'',blood:'low',bones:'ok',immune:'ok',prostate:'ok',reproductive:'',general:'ok'};
+let state = {...DEMO}, off = {}, sex = 'm', hl = null;
+
+const BODY = 'M91,40 L96,40 C97,50 99,56 108,60 C120,64 131,66 134,78 C137,96 139,120 142,150 C143,162 146,172 147,182 C149,192 147,200 142,200 C138,200 137,194 137,186 C135,170 131,150 129,134 C127,120 126,108 125,98 C123,112 120,126 119,140 C119,152 124,162 124,178 C124,200 118,230 116,262 C115,274 116,282 119,288 C121,293 117,296 110,296 C104,296 103,292 103,286 C103,268 101,236 97,212 C95,200 93,194 91,192 Z';
+const M = 'transform="matrix(-1 0 0 1 180 0)"';
+const OUTL = BODY.replace('M91,40 L96,40 ', 'M96,40 ').replace(' Z', '');
+const SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 300" role="img" aria-label="Body map">
+<g id="body">
+<ellipse cx="90" cy="292" rx="44" ry="5" fill="#E6E0D5"/>
+<ellipse cx="90" cy="24" rx="16" ry="19" fill="#EDE3D8"/>
+<path d="${BODY}" fill="#EDE3D8"/><path d="${BODY}" fill="#EDE3D8" ${M}/>
+</g>
+<g id="sys-general" class="organ" data-code="general">
+<path class="ln" d="M84,41.6 A16.8,19.8 0 1 1 96,41.6"/>
+<path class="ln" d="${OUTL}"/><path class="ln" d="${OUTL}" ${M}/><path class="ln" d="M89,192 L91,192"/>
+</g>
+<g id="sys-lungs" class="organ" data-code="lungs">
+<path class="s" d="M77,73 C70,79 67,92 68,104 C69,111 77,111 81,106 C84,99 84,85 82,76 C81,71 79,71 77,73 Z"/>
+<path class="s" d="M103,73 C110,79 113,92 112,104 C111,111 103,111 99,106 C96,99 96,85 98,76 C99,71 101,71 103,73 Z"/>
+</g>
+<g id="sys-bones" class="organ" data-code="bones">
+<rect class="halo" x="67" y="199" width="13" height="48" rx="6.5" transform="rotate(4 73 222)"/>
+<rect class="halo" x="100" y="199" width="13" height="48" rx="6.5" transform="rotate(-4 107 222)"/>
+<rect class="s" x="71" y="203" width="5" height="40" rx="2.5" transform="rotate(4 73 222)"/>
+<rect class="s" x="104" y="203" width="5" height="40" rx="2.5" transform="rotate(-4 107 222)"/>
+<rect class="s" x="130" y="86" width="4.4" height="36" rx="2.2" transform="rotate(-7 132 104)"/>
+<rect class="s" x="45.6" y="86" width="4.4" height="36" rx="2.2" transform="rotate(7 48 104)"/>
+</g>
+<g id="sys-blood" class="organ" data-code="blood">
+<path class="ln" d="M134,134 C136,148 138,161 141,176" stroke-width="2.2" stroke-linecap="round"/>
+<path class="ln" d="M136.5,147 C139.5,150 141,152 142.5,156" stroke-width="1.4" stroke-linecap="round"/>
+<path class="ln" d="M46,134 C44,148 42,161 39,176" stroke-width="2.2" stroke-linecap="round"/>
+<path class="ln" d="M43.5,147 C40.5,150 39,152 37.5,156" stroke-width="1.4" stroke-linecap="round"/>
+<path class="s" d="M135,124 C135,124 131.5,128.5 131.5,130.6 C131.5,132.6 133.1,134 135,134 C136.9,134 138.5,132.6 138.5,130.6 C138.5,128.5 135,124 135,124 Z"/>
+</g>
+<g id="sys-heart" class="organ" data-code="heart">
+<circle class="halo" cx="93" cy="95" r="15"/>
+<path class="s" d="M93,104 C85,98 83,90 88,87 C91,85 93,88 93,90 C93,88 95,85 98,87 C103,90 101,98 93,104 Z"/>
+</g>
+<g id="sys-liver" class="organ" data-code="liver">
+<ellipse class="halo" cx="82" cy="112" rx="22" ry="12"/>
+<path class="s" d="M66,110 C76,104 96,104 100,110 C96,116 84,119 72,119 C64,118 63,113 66,110 Z"/>
+</g>
+<g id="sys-immune" class="organ" data-code="immune">
+<ellipse class="halo" cx="114.6" cy="108.4" rx="7" ry="8"/>
+<path class="s" d="M112,103 C115.5,101.6 118.4,104.5 117.6,109 C116.9,112.6 114,114.8 111.8,113.4 C113.3,110.4 113.4,106.6 112,103 Z"/>
+<circle class="s" cx="85.6" cy="42.6" r="1.3"/><circle class="s" cx="94.4" cy="42.6" r="1.3"/>
+<circle class="s" cx="120.5" cy="84" r="1.5"/><circle class="s" cx="122" cy="89" r="1.3"/>
+<circle class="s" cx="59.5" cy="84" r="1.5"/><circle class="s" cx="58" cy="89" r="1.3"/>
+<circle class="s" cx="79" cy="183" r="1.5"/><circle class="s" cx="81.5" cy="187" r="1.3"/>
+<circle class="s" cx="101" cy="183" r="1.5"/><circle class="s" cx="98.5" cy="187" r="1.3"/>
+</g>
+<g id="sys-pancreas" class="organ" data-code="pancreas">
+<ellipse class="halo" cx="97" cy="121.5" rx="18" ry="8"/>
+<path class="s" d="M84,121 C90,117 101,116.5 108,118 C112,119.5 111,124 106,124.8 C98,126 90,126 86,125 C82,124 82,122 84,121 Z"/>
+</g>
+<g id="sys-kidney" class="organ" data-code="kidney">
+<ellipse class="halo" cx="78" cy="136" rx="9" ry="12"/><ellipse class="halo" cx="102" cy="136" rx="9" ry="12"/>
+<path class="s" d="M78,128 C74,129 73,136 75,141 C77,145 82,144 82,140 C80,137 80,133 82,131 C82,128 80,127 78,128 Z"/>
+<path class="s" d="M102,128 C106,129 107,136 105,141 C103,145 98,144 98,140 C100,137 100,133 98,131 C98,128 100,127 102,128 Z"/>
+</g>
+<g id="sys-adrenal" class="organ" data-code="adrenal">
+<path class="s" d="M74,126.6 L78.2,121 L82.6,125.4 C80,127.4 77,127.6 74,126.6 Z"/>
+<path class="s" d="M106,126.6 L101.8,121 L97.4,125.4 C100,127.4 103,127.6 106,126.6 Z"/>
+</g>
+<g id="sys-thyroid" class="organ" data-code="thyroid">
+<ellipse class="halo" cx="90" cy="50" rx="12" ry="7"/>
+<path class="s" d="M90,50 C87,46 82,46 82,50 C82,54 87,54 90,51 C93,54 98,54 98,50 C98,46 93,46 90,50 Z"/>
+</g>
+<g id="sys-parathyroid" class="organ" data-code="parathyroid">
+<circle class="s" cx="80.6" cy="47.2" r="1.35"/><circle class="s" cx="80.6" cy="52.8" r="1.35"/>
+<circle class="s" cx="99.4" cy="47.2" r="1.35"/><circle class="s" cx="99.4" cy="52.8" r="1.35"/>
+</g>
+<g id="sys-pituitary" class="organ" data-code="pituitary">
+<circle class="halo" cx="90" cy="26" r="6"/>
+<path class="ln" d="M90,19 L90,23.5" stroke-width="1" stroke-linecap="round"/>
+<ellipse class="s" cx="90" cy="26" rx="2.8" ry="2.4"/>
+</g>
+<g id="sys-prostate" class="organ" data-code="prostate" data-sex="m">
+<circle class="halo" cx="90" cy="181" r="6.5"/>
+<path class="s" d="M90,177.6 C93.2,177.6 94.2,179.8 93.7,182 C93.1,184.2 91.5,185 90,185 C88.5,185 86.9,184.2 86.3,182 C85.8,179.8 86.8,177.6 90,177.6 Z"/>
+</g>
+<g id="sys-reproductive" class="organ" data-code="reproductive">
+<g data-sex="f">
+<circle class="halo" cx="90" cy="177" r="13"/>
+<path class="ln" d="M85.5,173.6 C83.5,171.5 81.5,171.3 79.6,172.4 M94.5,173.6 C96.5,171.5 98.5,171.3 100.4,172.4" stroke-width="1.2" stroke-linecap="round"/>
+<path class="s" d="M90,186 C87,186 86,181 85.2,177.4 C84.4,173.6 86.6,171.6 90,172.2 C93.4,171.6 95.6,173.6 94.8,177.4 C94,181 93,186 90,186 Z"/>
+<ellipse class="s" cx="78.6" cy="173.4" rx="2.6" ry="2"/><ellipse class="s" cx="101.4" cy="173.4" rx="2.6" ry="2"/>
+</g>
+<g data-sex="m">
+<circle class="halo" cx="90" cy="188" r="6"/>
+<ellipse class="s" cx="87.4" cy="188.4" rx="1.9" ry="2.4"/><ellipse class="s" cx="92.6" cy="188.4" rx="1.9" ry="2.4"/>
+</g>
+</g>
+</svg>`;
+
+const stage = document.getElementById('stage');
+stage.innerHTML = SVG;
+const svg = stage.querySelector('svg');
+const byCode = c => svg.querySelector('#sys-' + c);
+
+function paint(){
+  for (const s of SYS){
+    const g = byCode(s.code); if (!g) continue;
+    g.setAttribute('class', ['organ', state[s.code] || '', off[s.code] ? 'off' : '', hl === s.code ? 'hl' : ''].filter(Boolean).join(' '));
+  }
+  svg.querySelectorAll('[data-sex]').forEach(el => {
+    const show = el.getAttribute('data-sex') === sex;
+    if (el.classList.contains('organ')) { if (!show) el.classList.add('hidden-sex'); }
+    else el.style.display = show ? '' : 'none';
+  });
+  for (const s of SYS){
+    const row = document.getElementById('row-' + s.code);
+    row.classList.toggle('hl', hl === s.code);
+    row.classList.toggle('off', !!off[s.code] || (s.sex && s.sex !== sex));
+    row.querySelectorAll('[data-st]').forEach(b => b.setAttribute('aria-pressed', String((state[s.code] || '') === b.dataset.st)));
+    const eye = row.querySelector('.eye'); eye.setAttribute('aria-pressed', String(!off[s.code])); eye.textContent = off[s.code] ? 'Hidden' : 'Shown';
+  }
+  const f = document.getElementById('focus');
+  if (hl){ const s = SYS.find(x => x.code === hl); const st = {ok:'in range',high:'high',low:'low','':'not tested'}[state[hl] || ''];
+    f.innerHTML = '<b>' + s.name + '</b> · ' + st + '<br>' + s.shape + '. Key tests: ' + s.tests + '.'; }
+  else f.textContent = 'Tap a shape or a row to see what it stands for.';
+  document.getElementById('svgout').value = exportSvg();
+}
+
+function exportSvg(){
+  const c = svg.cloneNode(true);
+  c.querySelectorAll('.organ').forEach(g => { g.classList.remove('hl'); if (g.classList.contains('hidden-sex')) g.remove(); });
+  c.querySelectorAll('[data-sex]').forEach(el => { if (el.style.display === 'none') el.remove(); else el.removeAttribute('style'); });
+  const css = '.organ .s{fill:#D6CBBD}.organ .ln{stroke:#D6CBBD;fill:none}.organ.ok .s{fill:#0E6B63}.organ.ok .ln{stroke:#0E6B63}.organ.high .s{fill:#B8561B}.organ.high .ln{stroke:#B8561B}.organ.low .s{fill:#2A5CA0}.organ.low .ln{stroke:#2A5CA0}.organ .halo{opacity:0}.organ.high .halo{opacity:.16;fill:#B8561B}.organ.low .halo{opacity:.16;fill:#2A5CA0}.organ.off{display:none}#sys-general .ln{stroke-width:1.1;stroke-dasharray:3 2.2}#sys-general.ok .ln{stroke-dasharray:none}';
+  const st = document.createElementNS('http://www.w3.org/2000/svg','style'); st.textContent = css; c.insertBefore(st, c.firstChild);
+  return c.outerHTML.replace(/></g, '>\n<');
+}
+
+const list = document.getElementById('list');
+for (const s of SYS){
+  const row = document.createElement('div'); row.className = 'sys'; row.id = 'row-' + s.code;
+  row.innerHTML = '<div class="name"><b>' + s.name + (s.isNew ? ' <span class="new">NEW SHAPE</span>' : '') + '</b><small>' + s.shape + '</small></div>' +
+   '<div class="row" style="justify-content:flex-end"><div class="seg" role="group" aria-label="' + s.name + ' result">' +
+   '<button type="button" class="st-ok" data-st="ok">In range</button><button type="button" class="st-high" data-st="high">High</button><button type="button" class="st-low" data-st="low">Low</button><button type="button" data-st="">Not tested</button></div>' +
+   '<button type="button" class="btn eye" style="min-height:34px;padding:5px 12px;font-size:12px">Shown</button></div>';
+  row.querySelectorAll('[data-st]').forEach(b => b.addEventListener('click', () => { state[s.code] = b.dataset.st; hl = s.code; paint(); }));
+  row.querySelector('.eye').addEventListener('click', () => { off[s.code] = !off[s.code]; paint(); });
+  row.querySelector('.name').addEventListener('click', () => { hl = hl === s.code ? null : s.code; paint(); });
+  list.appendChild(row);
+  const tr = document.createElement('tr');
+  tr.innerHTML = '<td>' + s.name + (s.isNew ? ' <span class="new">NEW</span>' : '') + '</td><td><code>#sys-' + s.code + '</code></td><td>' + s.shape + '</td><td>' + s.tests + '</td>';
+  document.getElementById('devtable').appendChild(tr);
+}
+svg.querySelectorAll('.organ').forEach(g => g.addEventListener('click', () => { const c = g.dataset.code; hl = hl === c ? null : c; paint(); }));
+
+function setPressed(a, b){ document.getElementById(a).setAttribute('aria-pressed','true'); document.getElementById(b).setAttribute('aria-pressed','false'); }
+document.getElementById('sex-m').onclick = () => { sex = 'm'; setPressed('sex-m','sex-f'); paint(); };
+document.getElementById('sex-f').onclick = () => { sex = 'f'; setPressed('sex-f','sex-m'); paint(); };
+document.getElementById('pre-demo').onclick = () => { state = {...DEMO}; setPressed('pre-demo','pre-new'); hl = null; paint(); };
+document.getElementById('pre-new').onclick = () => { state = {}; for (const s of SYS) state[s.code] = s.isNew ? (DEMO[s.code] || 'ok') : ''; setPressed('pre-new','pre-demo'); hl = null; paint(); };
+document.getElementById('copy').onclick = async () => {
+  const t = document.getElementById('toast'), ta = document.getElementById('svgout');
+  try { await navigator.clipboard.writeText(ta.value); t.textContent = 'SVG copied'; }
+  catch(e){ ta.focus(); ta.select(); t.textContent = 'Press Ctrl+C or Cmd+C to copy the selected SVG'; }
+};
+paint();
+</script>
+
+</body></html>

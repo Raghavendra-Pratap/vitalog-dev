@@ -1,0 +1,122 @@
+[
+  {
+    "text": "T3",
+    "x": 40,
+    "y": 100,
+    "w": 14.0,
+    "h": 14,
+    "conf": 95,
+    "page": 1,
+    "source": "ocr"
+  },
+  {
+    "text": "110.00",
+    "x": 220,
+    "y": 100,
+    "w": 40,
+    "h": 14,
+    "conf": 98,
+    "page": 1,
+    "source": "ocr"
+  },
+  {
+    "text": "ng/dL",
+    "x": 300,
+    "y": 100,
+    "w": 50,
+    "h": 14,
+    "conf": 90,
+    "page": 1,
+    "source": "ocr"
+  },
+  {
+    "text": "T4",
+    "x": 40,
+    "y": 130,
+    "w": 14.0,
+    "h": 14,
+    "conf": 95,
+    "page": 1,
+    "source": "ocr"
+  },
+  {
+    "text": "9.57",
+    "x": 220,
+    "y": 130,
+    "w": 40,
+    "h": 14,
+    "conf": 98,
+    "page": 1,
+    "source": "ocr"
+  },
+  {
+    "text": "\u00b5g/dL",
+    "x": 300,
+    "y": 130,
+    "w": 50,
+    "h": 14,
+    "conf": 90,
+    "page": 1,
+    "source": "ocr"
+  },
+  {
+    "text": "TSH (ULTRASENSITIVE)",
+    "x": 40,
+    "y": 160,
+    "w": 140.0,
+    "h": 14,
+    "conf": 95,
+    "page": 1,
+    "source": "ocr"
+  },
+  {
+    "text": "2.720",
+    "x": 220,
+    "y": 160,
+    "w": 40,
+    "h": 14,
+    "conf": 98,
+    "page": 1,
+    "source": "ocr"
+  },
+  {
+    "text": "\u00b5IU/mL",
+    "x": 300,
+    "y": 160,
+    "w": 50,
+    "h": 14,
+    "conf": 90,
+    "page": 1,
+    "source": "ocr"
+  },
+  {
+    "text": "Haemoglobin",
+    "x": 40,
+    "y": 220,
+    "w": 90,
+    "h": 14,
+    "conf": 92,
+    "page": 1,
+    "source": "ocr"
+  },
+  {
+    "text": "13.2",
+    "x": 220,
+    "y": 236,
+    "w": 30,
+    "h": 14,
+    "conf": 96,
+    "page": 1,
+    "source": "ocr"
+  },
+  {
+    "text": "g/dL",
+    "x": 300,
+    "y": 236,
+    "w": 35,
+    "h": 14,
+    "conf": 90,
+    "page": 1,
+    "source": "ocr"
+  }
+]
