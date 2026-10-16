@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../updates/app_update.dart';
 
 import '../../data/catalog_host.dart';
 import '../../data/drug_index.dart';
@@ -52,6 +55,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _medicineLibUpdating = false;
   String _catalogStatus = 'Loading…';
   bool _catalogUpdating = false;
+  String _appUpdateStatus = 'This copy is $vitalogReleaseVersion.';
+  bool _appUpdateChecking = false;
+  Uri? _appUpdateUrl;
 
   @override
   void initState() {
@@ -60,6 +66,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _refreshMedicineLibraryStatus();
     _refreshCatalogStatus();
     _loadBackupMeta();
+    if (widget.desktop) _checkAppUpdate();
   }
 
   Future<void> _loadBackupMeta() async {
@@ -113,6 +120,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _checkAppUpdate() async {
+    if (_appUpdateChecking) return;
+    setState(() => _appUpdateChecking = true);
+    final status = await checkAppUpdate();
+    if (!mounted) return;
+    setState(() {
+      _appUpdateChecking = false;
+      _appUpdateStatus = status.message;
+      _appUpdateUrl = status.download;
+    });
+  }
+
+  Future<void> _downloadAppUpdate() async {
+    final url = _appUpdateUrl;
+    if (url == null) {
+      await _checkAppUpdate();
+      return;
+    }
+    final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the download. Try again.')),
+      );
+    }
   }
 
   Future<void> _refreshMedicineLibraryStatus() async {
@@ -507,6 +540,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             );
 
+        final copy = section('This copy', [
+          _actionRow(
+            icon: Icons.system_update_alt_outlined,
+            title: 'Vitalog $vitalogReleaseVersion',
+            subtitle: _appUpdateChecking ? 'Checking GitHub…' : _appUpdateStatus,
+            actionLabel: _appUpdateUrl != null ? 'Download' : 'Check',
+            onAction: _appUpdateChecking
+                ? () {}
+                : () {
+                    if (_appUpdateUrl != null) {
+                      _downloadAppUpdate();
+                    } else {
+                      _checkAppUpdate();
+                    }
+                  },
+          ),
+        ]);
+
         final sync = section('Sync & backup', [
           _actionRow(
             icon: Icons.cloud_outlined,
@@ -703,6 +754,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              copy,
+              SizedBox(height: gap),
               sync,
               SizedBox(height: gap),
               security,
@@ -724,6 +777,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  copy,
+                  SizedBox(height: gap),
                   sync,
                   SizedBox(height: gap),
                   tests,
