@@ -134,7 +134,7 @@ jobs:
         if: matrix.platform == 'windows'
         shell: pwsh
         working-directory: app/build/windows/x64/runner/Release
-        run: Compress-Archive -Path * -DestinationPath "$env:GITHUB_WORKSPACE/Vitalog-windows.zip"
+        run: tar -a -c -f "$env:GITHUB_WORKSPACE/Vitalog-windows.zip" *
 
       - name: Build Linux
         if: matrix.platform == 'linux'
@@ -148,24 +148,24 @@ jobs:
 
       - name: Upload macOS
         if: matrix.platform == 'macos'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: Vitalog-macos
           path: Vitalog-macos.zip
+          archive: false
           if-no-files-found: error
 
       - name: Upload Windows
         if: matrix.platform == 'windows'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: Vitalog-windows
           path: Vitalog-windows.zip
+          archive: false
           if-no-files-found: error
 
       - name: Upload Linux
         if: matrix.platform == 'linux'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: Vitalog-linux
           path: Vitalog-linux.tar.gz
+          archive: false
           if-no-files-found: error
