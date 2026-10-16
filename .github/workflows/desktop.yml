@@ -125,12 +125,12 @@ jobs:
           flutter build windows --release 2>&1 | tee "$RUNNER_TEMP/windows-build.txt"
           code=${PIPESTATUS[0]}
           if [ "$code" -ne 0 ]; then
-            {
-              echo "## Windows build"
-              grep -E "error:|error C|CMake Error|fatal error|FAILED|LNK[0-9]" "$RUNNER_TEMP/windows-build.txt" | tail -30 || true
-              echo "--- tail ---"
-              tail -20 "$RUNNER_TEMP/windows-build.txt"
-            } >> "$GITHUB_STEP_SUMMARY"
+            grep -E "error:|error C|CMake Error|fatal error|FAILED|LNK[0-9]" "$RUNNER_TEMP/windows-build.txt" | tail -25 | while IFS= read -r line; do
+              echo "::error::${line:0:300}"
+            done
+            tail -15 "$RUNNER_TEMP/windows-build.txt" | while IFS= read -r line; do
+              echo "::error::${line:0:300}"
+            done
           fi
           exit "$code"
 
