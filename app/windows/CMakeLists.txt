@@ -58,6 +58,9 @@ add_subdirectory("runner")
 # Desktop does not use JNI. The jni plugin fails its Windows build when a JDK
 # is installed, which GitHub's Windows runners have.
 set(CMAKE_DISABLE_FIND_PACKAGE_JNI TRUE)
+# MSVC 14.51 turns <experimental/coroutine> into a hard error. local_auth_windows
+# still includes that header. This is Microsoft's documented suppression.
+add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 include(flutter/generated_plugins.cmake)
 
 
