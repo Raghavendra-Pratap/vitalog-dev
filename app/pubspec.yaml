@@ -79,7 +79,7 @@ msix_config:
   publisher_display_name: Raghavendra Pratap
   identity_name: RaghavendraPratap.Vitalog
   publisher: CN=36A7C9C2-03FD-4700-A34E-3BF7A6216896
-  msix_version: 0.2.8.99
+  msix_version: 0.2.8.0
   logo_path: windows/store/StoreLogo.png
   capabilities: internetClient, privateNetworkClientServer, webcam
   languages: en-us
