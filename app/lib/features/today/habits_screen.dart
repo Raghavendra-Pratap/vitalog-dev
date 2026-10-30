@@ -6,6 +6,7 @@ import '../../data/local_store.dart';
 import '../../desktop.dart';
 import '../../theme/desktop_layout.dart';
 import '../../theme/tokens.dart';
+import '../medicines/dose_wait_header_chip.dart';
 import 'habit_detail_screen.dart';
 import 'habit_editor.dart';
 
@@ -224,10 +225,14 @@ class HabitsScreenState extends State<HabitsScreen> {
                 textAlign: TextAlign.center,
                 style: TextStyle(color: BodylineColors.inkSubtle),
               ),
-              if (!widget.embedded) ...[
+              if (widget.embedded) ...[
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: promptAdd,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: BodylineColors.ink,
+                    foregroundColor: BodylineColors.onInk,
+                  ),
                   icon: const Icon(Icons.add),
                   label: const Text('New habit'),
                 ),
@@ -392,11 +397,15 @@ class HabitsScreenState extends State<HabitsScreen> {
     if (widget.embedded) return body;
     return Scaffold(
       backgroundColor: BodylineColors.paper,
-      appBar: AppBar(title: const Text('Habits')),
-      floatingActionButton: FloatingActionButton.extended(
+      appBar: AppBar(
+        title: const Text('Habits'),
+        actions: doseWaitActions(),
+      ),
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'page-habits-fab',
         onPressed: promptAdd,
-        icon: const Icon(Icons.add),
-        label: const Text('New habit'),
+        tooltip: 'New habit',
+        child: const Icon(Icons.add),
       ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),

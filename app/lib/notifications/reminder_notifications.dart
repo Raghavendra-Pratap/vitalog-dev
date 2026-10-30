@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
@@ -39,18 +41,15 @@ class ReminderNotifications {
 
   Future<void> init() async {
     if (kIsWeb) return;
-    tzdata.initializeTimeZones();
-    try {
-      final name = await FlutterTimezone.getLocalTimezone();
-      tz.setLocalLocation(tz.getLocation(name));
-    } catch (_) {
-      tz.setLocalLocation(tz.getLocation('UTC'));
-    }
+    await _configureLocalTimezone();
 
     const darwinInit = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
+      defaultPresentAlert: true,
+      defaultPresentBadge: true,
+      defaultPresentSound: true,
     );
     const androidInitWithActions = AndroidInitializationSettings('@mipmap/ic_launcher');
     await _plugin.initialize(
@@ -101,6 +100,63 @@ class ReminderNotifications {
     _ready = true;
   }
 
+  Future<void> _configureLocalTimezone() async {
+    tzdata.initializeTimeZones();
+    String? name;
+    try {
+      name = await FlutterTimezone.getLocalTimezone();
+    } catch (e) {
+      debugPrint('Vitalog: FlutterTimezone failed: $e');
+    }
+    if (name != null && name.isNotEmpty) {
+      for (final candidate in <String>{
+        name,
+        name.replaceAll(' ', '_'),
+        if (name == 'Asia/Calcutta') 'Asia/Kolkata',
+        if (name == 'Asia/Katmandu') 'Asia/Kathmandu',
+      }) {
+        try {
+          tz.setLocalLocation(tz.getLocation(candidate));
+          return;
+        } catch (_) {}
+      }
+      debugPrint('Vitalog: unknown timezone "$name", using device offset');
+    }
+    // Native schedulers need a real IANA name — map common offsets when lookup fails.
+    final minutes = DateTime.now().timeZoneOffset.inMinutes;
+    const byOffset = <int, String>{
+      0: 'UTC',
+      330: 'Asia/Kolkata',
+      345: 'Asia/Kathmandu',
+      360: 'Asia/Dhaka',
+      480: 'Asia/Shanghai',
+      540: 'Asia/Tokyo',
+      -300: 'America/New_York',
+      -360: 'America/Chicago',
+      -420: 'America/Denver',
+      -480: 'America/Los_Angeles',
+      60: 'Europe/Berlin',
+      120: 'Europe/Helsinki',
+    };
+    final mapped = byOffset[minutes];
+    if (mapped != null) {
+      try {
+        tz.setLocalLocation(tz.getLocation(mapped));
+        return;
+      } catch (_) {}
+    }
+    try {
+      final hours = minutes ~/ 60;
+      if (minutes % 60 == 0 && hours != 0) {
+        final etcSign = minutes >= 0 ? '-' : '+';
+        tz.setLocalLocation(tz.getLocation('Etc/GMT$etcSign${hours.abs()}'));
+        return;
+      }
+    } catch (_) {}
+    debugPrint('Vitalog: no IANA match for offset ${minutes}m — UTC (dose times may drift)');
+    tz.setLocalLocation(tz.UTC);
+  }
+
   void _onResponse(NotificationResponse response) {
     final action = response.actionId;
     final payload = response.payload;
@@ -122,7 +178,8 @@ class ReminderNotifications {
       try {
         await android?.requestExactAlarmsPermission();
       } catch (_) {}
-      return granted ?? true;
+      if (granted == true) return true;
+      return await android?.areNotificationsEnabled() ?? false;
     }
     if (Platform.isIOS) {
       final ios = _plugin.resolvePlatformSpecificImplementation<
@@ -132,7 +189,8 @@ class ReminderNotifications {
         badge: true,
         sound: true,
       );
-      return granted ?? false;
+      if (granted == true) return true;
+      return await notificationsEnabled();
     }
     if (Platform.isMacOS) {
       final mac = _plugin.resolvePlatformSpecificImplementation<
@@ -142,7 +200,9 @@ class ReminderNotifications {
         badge: true,
         sound: true,
       );
-      return granted ?? false;
+      if (granted == true) return true;
+      // After Deny, macOS will not show the prompt again — Settings required.
+      return await notificationsEnabled();
     }
     return true;
   }
@@ -159,15 +219,46 @@ class ReminderNotifications {
       final ios = _plugin.resolvePlatformSpecificImplementation<
           IOSFlutterLocalNotificationsPlugin>();
       final opts = await ios?.checkPermissions();
-      return opts?.isEnabled ?? false;
+      return (opts?.isEnabled ?? false) || (opts?.isProvisionalEnabled ?? false);
     }
     if (Platform.isMacOS) {
       final mac = _plugin.resolvePlatformSpecificImplementation<
           MacOSFlutterLocalNotificationsPlugin>();
       final opts = await mac?.checkPermissions();
-      return opts?.isEnabled ?? false;
+      return (opts?.isEnabled ?? false) || (opts?.isProvisionalEnabled ?? false);
     }
     return true;
+  }
+
+  /// Opens the OS screen where Vitalog notification permission can be turned on.
+  Future<void> openSystemNotificationSettings() async {
+    if (kIsWeb) return;
+    try {
+      if (Platform.isMacOS) {
+        final r = await Process.run('open', [
+          'x-apple.systempreferences:com.apple.Notifications-Settings.extension',
+        ]);
+        if (r.exitCode != 0) {
+          await Process.run('open', [
+            '/System/Library/PreferencePanes/Notifications.prefPane',
+          ]);
+        }
+        return;
+      }
+      if (Platform.isIOS) {
+        final uri = Uri.parse('app-settings:');
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri);
+        }
+        return;
+      }
+      if (Platform.isAndroid) {
+        const channel = MethodChannel('vitalog/settings');
+        await channel.invokeMethod<void>('openNotificationSettings');
+      }
+    } catch (e) {
+      debugPrint('Vitalog: open notification settings failed: $e');
+    }
   }
 
   int _id(String reminderId, String kind) =>
@@ -254,12 +345,62 @@ class ReminderNotifications {
     required String body,
     required String payload,
     DateTimeComponents? match,
+    String channelId = _channelId,
+    String channelName = _channelName,
+    String channelDesc = _channelDesc,
   }) async {
-    await _plugin.zonedSchedule(
-      id,
+    try {
+      await _plugin.zonedSchedule(
+        id,
+        title,
+        body,
+        when,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            channelId,
+            channelName,
+            channelDescription: channelDesc,
+            importance: Importance.high,
+            priority: Priority.high,
+            styleInformation: BigTextStyleInformation(body),
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+          macOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+        androidScheduleMode: await _scheduleMode(),
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: match,
+        payload: payload,
+      );
+    } catch (e, st) {
+      debugPrint('Vitalog: schedule failed id=$id when=$when: $e\n$st');
+      rethrow;
+    }
+  }
+
+  static const _testNotificationId = 710099;
+
+  /// Immediate banner — verifies permission + channel wiring.
+  Future<bool> showTestNow({
+    String title = 'Vitalog test',
+    String body = 'Alerts are working on this device.',
+  }) async {
+    if (!_ready || kIsWeb) return false;
+    final ok = await ensurePermission();
+    if (!ok && !(await notificationsEnabled())) return false;
+    await _plugin.show(
+      _testNotificationId,
       title,
       body,
-      when,
       NotificationDetails(
         android: AndroidNotificationDetails(
           _channelId,
@@ -267,7 +408,6 @@ class ReminderNotifications {
           channelDescription: _channelDesc,
           importance: Importance.high,
           priority: Priority.high,
-          styleInformation: BigTextStyleInformation(body),
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
@@ -280,12 +420,32 @@ class ReminderNotifications {
           presentSound: true,
         ),
       ),
-      androidScheduleMode: await _scheduleMode(),
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: match,
-      payload: payload,
+      payload: 'test',
     );
+    return true;
+  }
+
+  /// One-shot in [seconds] — verifies AlarmManager / UNCalendar trigger.
+  Future<bool> scheduleTestIn({int seconds = 15}) async {
+    if (!_ready || kIsWeb) return false;
+    final ok = await ensurePermission();
+    if (!ok && !(await notificationsEnabled())) return false;
+    final when = tz.TZDateTime.now(tz.local).add(Duration(seconds: seconds));
+    await _plugin.cancel(_testNotificationId);
+    await _zoned(
+      id: _testNotificationId,
+      when: when,
+      title: 'Vitalog test',
+      body: 'Scheduled alert fired after $seconds seconds.',
+      payload: 'test',
+    );
+    return true;
+  }
+
+  Future<int> pendingCount() async {
+    if (!_ready || kIsWeb) return 0;
+    final pending = await _plugin.pendingNotificationRequests();
+    return pending.length;
   }
 
   Future<void> cancelReminder(String reminderId) async {
@@ -328,42 +488,47 @@ class ReminderNotifications {
       when = when.add(const Duration(days: 1));
     }
 
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      when,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _doseChannelId,
-          _doseChannelName,
-          channelDescription: _doseChannelDesc,
-          importance: Importance.high,
-          priority: Priority.high,
-          styleInformation: BigTextStyleInformation(body),
-          actions: const <AndroidNotificationAction>[
-            AndroidNotificationAction('taken', 'Taken'),
-            AndroidNotificationAction('snooze15', 'In 15 min'),
-            AndroidNotificationAction('skip', 'Skip'),
-          ],
-        ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-        macOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
-      androidScheduleMode: await _scheduleMode(),
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-      payload: 'dose|$medicationId|$timeHm',
-    );
+    try {
+      await _plugin.zonedSchedule(
+            id,
+            title,
+            body,
+            when,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                _doseChannelId,
+                _doseChannelName,
+                channelDescription: _doseChannelDesc,
+                importance: Importance.high,
+                priority: Priority.high,
+                styleInformation: BigTextStyleInformation(body),
+                actions: const <AndroidNotificationAction>[
+                  AndroidNotificationAction('taken', 'Taken'),
+                  AndroidNotificationAction('snooze15', 'In 15 min'),
+                  AndroidNotificationAction('skip', 'Skip'),
+                ],
+              ),
+              iOS: const DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+              ),
+              macOS: const DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+              ),
+            ),
+            androidScheduleMode: await _scheduleMode(),
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            matchDateTimeComponents: DateTimeComponents.time,
+            payload: 'dose|$medicationId|$timeHm',
+          );
+    } catch (e, st) {
+      debugPrint('Vitalog: schedule failed: $e\n$st');
+      rethrow;
+    }
   }
 
   Future<void> cancelDailyDose(String medicationId, String timeHm) async {
@@ -404,36 +569,41 @@ class ReminderNotifications {
     final now = tz.TZDateTime.now(tz.local);
     if (!when.isAfter(now)) return;
 
-    await _plugin.zonedSchedule(
-      doseWaitNotificationId,
-      title,
-      body,
-      when,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _waitChannelId,
-          _waitChannelName,
-          channelDescription: _waitChannelDesc,
-          importance: Importance.high,
-          priority: Priority.high,
-          styleInformation: BigTextStyleInformation(body),
-        ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-        macOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
-      androidScheduleMode: await _scheduleMode(),
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: 'dose_wait',
-    );
+    try {
+      await _plugin.zonedSchedule(
+            doseWaitNotificationId,
+            title,
+            body,
+            when,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                _waitChannelId,
+                _waitChannelName,
+                channelDescription: _waitChannelDesc,
+                importance: Importance.high,
+                priority: Priority.high,
+                styleInformation: BigTextStyleInformation(body),
+              ),
+              iOS: const DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+              ),
+              macOS: const DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+              ),
+            ),
+            androidScheduleMode: await _scheduleMode(),
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            payload: 'dose_wait',
+          );
+    } catch (e, st) {
+      debugPrint('Vitalog: schedule failed: $e\n$st');
+      rethrow;
+    }
   }
 
   Future<void> cancelDoseWait() async {
@@ -452,35 +622,40 @@ class ReminderNotifications {
     final id = (_doseId(medicationId, timeHm) ^ 0x4500) & 0x7fffffff;
     await _plugin.cancel(id);
     final when = tz.TZDateTime.now(tz.local).add(Duration(minutes: minutes));
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      when,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _doseChannelId,
-          _doseChannelName,
-          channelDescription: _doseChannelDesc,
-          importance: Importance.high,
-          priority: Priority.high,
-          actions: const <AndroidNotificationAction>[
-            AndroidNotificationAction('taken', 'Taken'),
-            AndroidNotificationAction('snooze15', 'In 15 min'),
-            AndroidNotificationAction('skip', 'Skip'),
-          ],
-        ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
-      androidScheduleMode: await _scheduleMode(),
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: 'dose|$medicationId|$timeHm',
-    );
+    try {
+      await _plugin.zonedSchedule(
+            id,
+            title,
+            body,
+            when,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                _doseChannelId,
+                _doseChannelName,
+                channelDescription: _doseChannelDesc,
+                importance: Importance.high,
+                priority: Priority.high,
+                actions: const <AndroidNotificationAction>[
+                  AndroidNotificationAction('taken', 'Taken'),
+                  AndroidNotificationAction('snooze15', 'In 15 min'),
+                  AndroidNotificationAction('skip', 'Skip'),
+                ],
+              ),
+              iOS: const DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+              ),
+            ),
+            androidScheduleMode: await _scheduleMode(),
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            payload: 'dose|$medicationId|$timeHm',
+          );
+    } catch (e, st) {
+      debugPrint('Vitalog: schedule failed: $e\n$st');
+      rethrow;
+    }
   }
 
   int _habitId(String habitId) =>
@@ -507,36 +682,41 @@ class ReminderNotifications {
       when = when.add(const Duration(days: 1));
     }
 
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      'Check in on Today when you can — not medical advice.',
-      when,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _habitChannelId,
-          _habitChannelName,
-          channelDescription: _habitChannelDesc,
-          importance: Importance.defaultImportance,
-          priority: Priority.defaultPriority,
-        ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-        macOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
-      androidScheduleMode: await _scheduleMode(),
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-      payload: 'habit|$habitId|$timeHm',
-    );
+    try {
+      await _plugin.zonedSchedule(
+            id,
+            title,
+            'Check in on Today when you can — not medical advice.',
+            when,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                _habitChannelId,
+                _habitChannelName,
+                channelDescription: _habitChannelDesc,
+                importance: Importance.defaultImportance,
+                priority: Priority.defaultPriority,
+              ),
+              iOS: const DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+              ),
+              macOS: const DarwinNotificationDetails(
+                presentAlert: true,
+                presentBadge: true,
+                presentSound: true,
+              ),
+            ),
+            androidScheduleMode: await _scheduleMode(),
+            uiLocalNotificationDateInterpretation:
+                UILocalNotificationDateInterpretation.absoluteTime,
+            matchDateTimeComponents: DateTimeComponents.time,
+            payload: 'habit|$habitId|$timeHm',
+          );
+    } catch (e, st) {
+      debugPrint('Vitalog: schedule failed: $e\n$st');
+      rethrow;
+    }
   }
 
   Future<void> cancelDailyHabit(String habitId) async {

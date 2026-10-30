@@ -6,6 +6,7 @@ import '../../data/local_store.dart';
 import '../../data/models.dart';
 import '../../notifications/reminder_notifications.dart';
 import '../../theme/tokens.dart';
+import 'dose_wait_header_chip.dart';
 import '../../theme/desktop_layout.dart';
 import '../../desktop.dart';
 import 'medicine_editor_dialog.dart';
@@ -438,15 +439,14 @@ class MedicinesScreenState extends State<MedicinesScreen> {
       backgroundColor: BodylineColors.paper,
       appBar: widget.embedded
           ? null
-          : AppBar(title: const Text('Medicines & remedies')),
+          : AppBar(
+            title: const Text('Medicines & remedies'),
+            actions: doseWaitActions(),
+          ),
       floatingActionButton: FloatingActionButton(
         heroTag: widget.embedded ? 'care-tab-medicines-fab' : 'page-medicines-fab',
         onPressed: _addMedicine,
         tooltip: 'Add medicine',
-        backgroundColor: BodylineColors.teal,
-        foregroundColor: BodylineColors.isDark
-            ? const Color(0xFF04201C)
-            : Colors.white,
         child: const Icon(Icons.add),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,

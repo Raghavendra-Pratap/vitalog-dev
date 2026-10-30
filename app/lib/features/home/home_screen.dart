@@ -27,6 +27,7 @@ import '../records/notes_screen.dart';
 import '../medicines/medicines_screen.dart';
 import '../medicines/dose_wait_screen.dart';
 import '../medicines/dose_wait_controller.dart';
+import '../medicines/dose_wait_header_chip.dart';
 import '../doctor/doctors_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -61,13 +62,28 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    widget.store.addListener(_onStore);
     _load();
   }
 
   @override
   void didUpdateWidget(covariant HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.store != widget.store) {
+      oldWidget.store.removeListener(_onStore);
+      widget.store.addListener(_onStore);
+    }
     _load();
+  }
+
+  @override
+  void dispose() {
+    widget.store.removeListener(_onStore);
+    super.dispose();
+  }
+
+  void _onStore() {
+    if (mounted) _load();
   }
 
   Future<void> _load() async {
@@ -149,10 +165,12 @@ class _HomeScreenState extends State<HomeScreen> {
   List<ObservationRecord> get _flaggedLatest {
     final id = widget.store.activeProfileId;
     final flagged = widget.store.observations
-        .where((o) =>
-            o.profileId == id &&
-            o.flag != null &&
-            o.flag != ObservationFlag.normal)
+        .where(
+          (o) =>
+              o.profileId == id &&
+              o.flag != null &&
+              o.flag != ObservationFlag.normal,
+        )
         .toList()
       ..sort((a, b) => b.observedAt.compareTo(a.observedAt));
     final seen = <String>{};
@@ -185,7 +203,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ..sort((a, b) => b.collectedAt.compareTo(a.collectedAt));
   }
 
-
   @override
   Widget build(BuildContext context) {
     BodylineColors.syncFrom(context);
@@ -202,7 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
         children: [
           Row(
             children: [
@@ -252,7 +269,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                       style: Theme.of(context)
                                           .textTheme
                                           .titleMedium
-                                          ?.copyWith(fontWeight: FontWeight.w700),
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                     ),
                                   ),
                                   const Icon(Icons.expand_more, size: 18),
@@ -267,7 +286,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               if (profile != null)
-                TextButton.icon(
+                IconButton(
+                  tooltip: 'Present',
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -276,9 +296,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     );
                   },
-                  icon: const Icon(Icons.present_to_all_outlined, size: 18),
-                  label: const Text('Present'),
+                  icon: const Icon(Icons.present_to_all_outlined),
                 ),
+              const DoseWaitHeaderChip(),
             ],
           ),
           const SizedBox(height: 16),
@@ -304,13 +324,37 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: Icons.today_outlined,
         label: 'Today',
         onTap: () => _openCarePage(
-          TodayScreen(
-            store: widget.store,
-            onChanged: () {
-              widget.onChanged();
-              _load();
-            },
-            onOpenHabits: () => _openCarePage(
+              TodayScreen(
+                store: widget.store,
+                onChanged: () {
+                  widget.onChanged();
+                  _load();
+                },
+                onOpenHabits: () => _openCarePage(
+                  HabitsScreen(
+                    store: widget.store,
+                    onChanged: () {
+                      widget.onChanged();
+                      _load();
+                    },
+                  ),
+                ),
+                onOpenMedicines: () => _openCarePage(
+                  MedicinesScreen(
+                    store: widget.store,
+                    onChanged: () {
+                      widget.onChanged();
+                      _load();
+                    },
+                  ),
+                ),
+              ),
+            ),
+      ),
+      (
+        icon: Icons.check_circle_outline,
+        label: 'Habits',
+        onTap: () => _openCarePage(
               HabitsScreen(
                 store: widget.store,
                 onChanged: () {
@@ -319,7 +363,51 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
             ),
-            onOpenMedicines: () => _openCarePage(
+      ),
+      (
+        icon: Icons.sticky_note_2_outlined,
+        label: 'Notes',
+        onTap: () => _openCarePage(
+              NotesScreen(
+                store: widget.store,
+                onChanged: () {
+                  widget.onChanged();
+                  _load();
+                },
+              ),
+            ),
+      ),
+      (
+        icon: Icons.medical_information_outlined,
+        label: 'Doctor',
+        onTap: () => _openCarePage(
+              DoctorsScreen(
+                store: widget.store,
+                onChanged: () {
+                  widget.onChanged();
+                  _load();
+                },
+              ),
+            ),
+      ),
+      (
+        icon: Icons.event_note_outlined,
+        label: 'Visit',
+        onTap: () => _openCarePage(
+              CareScreen(
+                store: widget.store,
+                onChanged: () {
+                  widget.onChanged();
+                  _load();
+                },
+                includeReminders: false,
+              ),
+            ),
+      ),
+      (
+        icon: Icons.medication_outlined,
+        label: 'Medicine',
+        onTap: () => _openCarePage(
               MedicinesScreen(
                 store: widget.store,
                 onChanged: () {
@@ -328,101 +416,31 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
             ),
-          ),
-        ),
-      ),
-      (
-        icon: Icons.check_circle_outline,
-        label: 'Habits',
-        onTap: () => _openCarePage(
-          HabitsScreen(
-            store: widget.store,
-            onChanged: () {
-              widget.onChanged();
-              _load();
-            },
-          ),
-        ),
-      ),
-      (
-        icon: Icons.sticky_note_2_outlined,
-        label: 'Notes',
-        onTap: () => _openCarePage(
-          NotesScreen(
-            store: widget.store,
-            onChanged: () {
-              widget.onChanged();
-              _load();
-            },
-          ),
-        ),
-      ),
-      (
-        icon: Icons.medical_information_outlined,
-        label: 'Doctor',
-        onTap: () => _openCarePage(
-          DoctorsScreen(
-            store: widget.store,
-            onChanged: () {
-              widget.onChanged();
-              _load();
-            },
-          ),
-        ),
-      ),
-      (
-        icon: Icons.event_note_outlined,
-        label: 'Visit',
-        onTap: () => _openCarePage(
-          CareScreen(
-            store: widget.store,
-            onChanged: () {
-              widget.onChanged();
-              _load();
-            },
-            includeReminders: false,
-          ),
-        ),
-      ),
-      (
-        icon: Icons.medication_outlined,
-        label: 'Medicine',
-        onTap: () => _openCarePage(
-          MedicinesScreen(
-            store: widget.store,
-            onChanged: () {
-              widget.onChanged();
-              _load();
-            },
-          ),
-        ),
       ),
       (
         icon: Icons.hourglass_bottom,
         label: 'Timer',
-        onTap: () => _openCarePage(
-          const DoseWaitScreen(mode: DoseWaitMode.countdown),
-        ),
+        onTap: () =>
+            _openCarePage(const DoseWaitScreen(mode: DoseWaitMode.countdown)),
       ),
       (
         icon: Icons.timer_outlined,
         label: 'Stopwatch',
-        onTap: () => _openCarePage(
-          const DoseWaitScreen(mode: DoseWaitMode.stopwatch),
-        ),
+        onTap: () =>
+            _openCarePage(const DoseWaitScreen(mode: DoseWaitMode.stopwatch)),
       ),
       (
         icon: Icons.notifications_none,
         label: 'Reminder',
         onTap: () => _openCarePage(
-          RemindersScreen(
-            store: widget.store,
-            onChanged: () {
-              widget.onChanged();
-              _load();
-            },
-          ),
-        ),
+              RemindersScreen(
+                store: widget.store,
+                onChanged: () {
+                  widget.onChanged();
+                  _load();
+                },
+              ),
+            ),
       ),
     ];
 
@@ -470,9 +488,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ],
             ),
@@ -483,13 +502,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openCarePage(Widget page) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => page),
-    );
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
     if (mounted) _load();
   }
 
-    Widget _needsAttentionEntry(List<ObservationRecord> needs) {
+  Widget _needsAttentionEntry(List<ObservationRecord> needs) {
     final subtitle = needs.isEmpty
         ? 'Nothing flagged right now'
         : needs.length == 1
@@ -548,10 +565,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text(
                       'Needs attention',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                          ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700, fontSize: 15),
                     ),
                     Text(
                       subtitle,
@@ -711,11 +728,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   )
                 : TrendPanel(
-                    key: ValueKey(needs[_needsTab.clamp(0, needs.length - 1)].parameterCode),
+                    key: ValueKey(
+                      needs[_needsTab.clamp(0, needs.length - 1)].parameterCode,
+                    ),
                     store: widget.store,
-                    parameterCode:
-                        needs[_needsTab.clamp(0, needs.length - 1)].parameterCode,
-                    title: needs[_needsTab.clamp(0, needs.length - 1)].parameterName,
+                    parameterCode: needs[_needsTab.clamp(0, needs.length - 1)]
+                        .parameterCode,
+                    title: needs[_needsTab.clamp(0, needs.length - 1)]
+                        .parameterName,
                     compact: true,
                     showHistory: false,
                     showRangeSelector: false,
@@ -794,10 +814,10 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Text(
             'Upcoming · family',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                ),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700, fontSize: 16),
           ),
           const SizedBox(height: 4),
           Expanded(
@@ -839,15 +859,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                 children: [
                                   ReportTitleText(
                                     r.title,
-                                      maxLines: 1,
+                                    maxLines: 1,
                                     style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                   Text(
-                                    'Due ${DateFormat('d MMM').format(r.dueAt)}',
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                    'Due ${DateFormat('d MMM · h:mm a').format(r.dueAt)}',
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
                                   ),
                                 ],
                               ),
@@ -876,10 +897,10 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Text(
             'Recent records',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                ),
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700, fontSize: 16),
           ),
           const SizedBox(height: 4),
           Expanded(
@@ -901,9 +922,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           .where((o) => o.reportId == r.id)
                           .toList();
                       final flagged = obs
-                          .where((o) =>
-                              o.flag != null &&
-                              o.flag != ObservationFlag.normal)
+                          .where(
+                            (o) =>
+                                o.flag != null &&
+                                o.flag != ObservationFlag.normal,
+                          )
                           .length;
                       return InkWell(
                         onTap: () {
@@ -936,9 +959,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                     Text(
                                       DateFormat('d MMM yyyy')
                                           .format(r.collectedAt),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall,
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
                                     ),
                                   ],
                                 ),
@@ -955,9 +977,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  flagged > 0
-                                      ? '$flagged flagged'
-                                      : 'In range',
+                                  flagged > 0 ? '$flagged flagged' : 'In range',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
@@ -982,23 +1002,38 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openBodySystems() {
     Navigator.of(context)
         .push(
-          MaterialPageRoute(
-            builder: (_) => _BodySystemsPage(
-              store: widget.store,
-              desktop: widget.desktop,
-              onChanged: widget.onChanged,
-            ),
-          ),
-        )
+      MaterialPageRoute(
+        builder: (_) => _BodySystemsPage(
+          store: widget.store,
+          desktop: widget.desktop,
+          onChanged: widget.onChanged,
+        ),
+      ),
+    )
         .then((_) {
       if (mounted) _load();
     });
   }
 
+  /// Spotlight organs for the phone "Your body" card (fits beside the figure).
+  List<OrganSummary> _homeSpotlightOrgans() {
+    // Use full catalogue — not visibility prefs — so home always shows six.
+    final source = _allOrgans.isNotEmpty ? _allOrgans : _organs;
+    final byCode = {for (final o in source) o.code: o};
+    final spotlight = [
+      for (final code in BodyPanelPrefs.homeSpotlightCodes)
+        if (byCode.containsKey(code)) byCode[code]!,
+    ];
+    if (spotlight.isNotEmpty) return spotlight.take(6).toList();
+    return source.take(6).toList();
+  }
+
   Widget _yourBodyImageCard() {
     final mapFlags = _bodyPrefs.mapFlags(_flags);
+    final homeOrgans = _homeSpotlightOrgans();
+    const mapH = 320.0;
     return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
       decoration: BoxDecoration(
         color: BodylineColors.surface,
         borderRadius: BorderRadius.circular(BodylineRadii.card),
@@ -1007,27 +1042,91 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Your body',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                ),
-          ),
-          const SizedBox(height: 4),
           InkWell(
             onTap: _openBodySystems,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(8),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Center(
-                child: BodyMapView(
-                  flags: mapFlags,
-                  width: 220,
-                  height: 360,
-                  sex: _profile?.sex,
-                ),
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Your body',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700, fontSize: 16),
+                    ),
+                  ),
+                  Text(
+                    'All organs',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: BodylineColors.tealDark,
+                        ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 18,
+                    color: BodylineColors.tealDark,
+                  ),
+                ],
               ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          SizedBox(
+            height: mapH,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                InkWell(
+                  onTap: _openBodySystems,
+                  borderRadius: BorderRadius.circular(12),
+                  child: BodyMapView(
+                    flags: mapFlags,
+                    width: 168,
+                    height: mapH,
+                    sex: _profile?.sex,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: homeOrgans.isEmpty
+                      ? Center(
+                          child: TextButton(
+                            onPressed: _openBodySystems,
+                            child: const Text('All organs'),
+                          ),
+                        )
+                      : Column(
+                          children: [
+                            for (final organ in homeOrgans)
+                              Expanded(
+                                child: _OrganStatusRow(
+                                  organ: organ,
+                                  dense: true,
+                                  alwaysInfo: true,
+                                  onOpen: () {
+                                    Navigator.of(context)
+                                        .push(
+                                          MaterialPageRoute(
+                                            builder: (_) => OrganDetailScreen(
+                                              store: widget.store,
+                                              systemCode: organ.code,
+                                            ),
+                                          ),
+                                        )
+                                        .then((_) {
+                                      if (mounted) _load();
+                                    });
+                                  },
+                                ),
+                              ),
+                          ],
+                        ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1055,10 +1154,10 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Text(
                 'Your body',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700, fontSize: 16),
               ),
               const Spacer(),
               if (latest != null && mapBesideList)
@@ -1084,25 +1183,32 @@ class _HomeScreenState extends State<HomeScreen> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                BodyMapView(flags: mapFlags, width: 180, height: 300, sex: _profile?.sex),
+                BodyMapView(
+                  flags: mapFlags,
+                  width: 180,
+                  height: 300,
+                  sex: _profile?.sex,
+                ),
                 const SizedBox(width: 12),
                 Expanded(child: list),
               ],
             )
           else ...[
             Center(
-              child: BodyMapView(flags: mapFlags, width: 180, height: 300, sex: _profile?.sex),
+              child: BodyMapView(
+                flags: mapFlags,
+                width: 180,
+                height: 300,
+                sex: _profile?.sex,
+              ),
             ),
             const SizedBox(height: 10),
-            Expanded(
-              child: SingleChildScrollView(child: list),
-            ),
+            Expanded(child: SingleChildScrollView(child: list)),
           ],
         ],
       ),
     );
   }
-
 
   Widget _surfaceBox({required Widget child}) {
     return Container(
@@ -1131,7 +1237,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
   Widget _organRow(OrganSummary organ) {
     return _OrganStatusRow(
       organ: organ,
@@ -1150,7 +1255,6 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
-
 }
 
 class _BodySystemsPage extends StatefulWidget {
@@ -1214,7 +1318,7 @@ class _BodySystemsPageState extends State<_BodySystemsPage> {
     return Scaffold(
       backgroundColor: BodylineColors.paper,
       appBar: AppBar(
-        title: const Text('Your body'),
+        title: const Text('All organs'),
         actions: [
           IconButton(
             tooltip: 'Customize',
@@ -1250,10 +1354,17 @@ class _BodySystemsPageState extends State<_BodySystemsPage> {
 }
 
 class _OrganStatusRow extends StatelessWidget {
-  const _OrganStatusRow({required this.organ, required this.onOpen});
+  const _OrganStatusRow({
+    required this.organ,
+    required this.onOpen,
+    this.dense = false,
+    this.alwaysInfo = false,
+  });
 
   final OrganSummary organ;
   final VoidCallback onOpen;
+  final bool dense;
+  final bool alwaysInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -1276,64 +1387,68 @@ class _OrganStatusRow extends StatelessWidget {
       ObservationFlag.low || ObservationFlag.criticalLow => BodylineColors.blue,
     };
 
+    final info = Tooltip(
+      message: organ.flag == null ? 'Not tested' : organ.statusText,
+      child: InkWell(
+        onTap: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                organ.flag == null
+                    ? 'Not tested — no results for this area yet.'
+                    : organ.statusText,
+              ),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Icon(
+            Icons.info_outline,
+            size: dense ? 15 : 16,
+            color: BodylineColors.inkSubtle,
+          ),
+        ),
+      ),
+    );
+
     return InkWell(
       onTap: onOpen,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: EdgeInsets.symmetric(vertical: dense ? 2 : 12),
+        alignment: dense ? Alignment.centerLeft : null,
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: BodylineColors.divider)),
         ),
         child: Row(
           children: [
             Container(
-              width: 10,
-              height: 10,
+              width: dense ? 8 : 10,
+              height: dense ? 8 : 10,
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: dense ? 8 : 8),
             Expanded(
               child: Text(
-                organ.name,
+                BodyPanelPrefs.shortLabel(organ.code, organ.name),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: dense ? 13 : 14,
                   fontWeight: FontWeight.w600,
                   color: organ.flag == null
                       ? BodylineColors.inkSubtle
                       : BodylineColors.ink,
-                  decoration: organ.flag == null
-                      ? TextDecoration.lineThrough
-                      : null,
+                  decoration:
+                      organ.flag == null ? TextDecoration.lineThrough : null,
                   decorationColor: BodylineColors.inkSubtle,
                 ),
               ),
             ),
-            if (organ.flag == null)
-              Tooltip(
-                message: 'Not tested',
-                child: InkWell(
-                  onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Not tested — no results for this area yet.',
-                        ),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.info_outline,
-                      size: 16,
-                      color: BodylineColors.inkSubtle,
-                    ),
-                  ),
-                ),
-              )
+            if (alwaysInfo || organ.flag == null)
+              info
             else ...[
               const SizedBox(width: 8),
               Text(

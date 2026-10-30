@@ -5,6 +5,7 @@ import '../../data/attention_prefs.dart';
 import '../../data/local_store.dart';
 import '../../data/models.dart';
 import '../../theme/tokens.dart';
+import '../medicines/dose_wait_header_chip.dart';
 import '../../widgets/status_pill.dart';
 import '../tests/trend_screen.dart';
 import 'customize_attention_sheet.dart';
@@ -88,13 +89,13 @@ class _NeedsAttentionScreenState extends State<NeedsAttentionScreen> {
       backgroundColor: BodylineColors.paper,
       appBar: AppBar(
         title: const Text('Needs attention'),
-        actions: [
+        actions: doseWaitActions([
           IconButton(
             tooltip: 'Customize',
             onPressed: _loading ? null : _customize,
             icon: const Icon(Icons.tune),
           ),
-        ],
+        ]),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

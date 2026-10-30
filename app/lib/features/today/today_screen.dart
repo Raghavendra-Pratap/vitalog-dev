@@ -11,6 +11,7 @@ import 'habit_amount_log_dialog.dart';
 import 'habit_editor.dart';
 import 'habit_detail_screen.dart';
 import '../settings/health_connect_screen.dart';
+import '../medicines/dose_wait_header_chip.dart';
 
 /// Today dashboard — habits + today's medicines (desktop mockup DesktopTodayV3).
 class TodayScreen extends StatefulWidget {
@@ -273,7 +274,6 @@ class TodayScreenState extends State<TodayScreen> {
       onToggle: _toggleHabit,
       onOpen: _openHabit,
       onAllHabits: widget.onOpenHabits,
-      onAdd: promptAdd,
       expand: widget.desktop,
     );
     final family = _FamilyTodayCard(
@@ -303,38 +303,10 @@ class TodayScreenState extends State<TodayScreen> {
       footer: widget.desktop ? footer : null,
     );
 
-    Widget mobileHeader() => Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Today',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: BodylineColors.ink,
-                        ),
-                  ),
-                  Text(
-                    '${DateFormat('EEEE, d MMMM').format(DateTime.now())} · $_profileName',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: BodylineColors.inkSubtle,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            FilledButton.icon(
-              onPressed: promptAdd,
-              style: FilledButton.styleFrom(
-                backgroundColor: BodylineColors.ink,
-                foregroundColor: BodylineColors.onInk,
-              ),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('New habit'),
-            ),
-          ],
+    Widget mobileHeader() => TabPageHeader(
+          title: 'Today',
+          subtitle:
+              '${DateFormat('EEEE, d MMMM').format(DateTime.now())} · $_profileName',
         );
 
     late final Widget body;
@@ -408,12 +380,7 @@ class TodayScreenState extends State<TodayScreen> {
             const SizedBox(height: 14),
             family,
             const SizedBox(height: 28),
-            Text(
-              'Last 7 days',
-              style: _TodayChrome.sectionTitle(context),
-            ),
-            const SizedBox(height: _TodayChrome.sectionGap),
-            const _WeekLegend(),
+            const _Last7DaysHeader(),
             const SizedBox(height: _TodayChrome.sectionGap),
             weekGrid,
             const SizedBox(height: 16),
@@ -582,7 +549,6 @@ class _HabitsCard extends StatelessWidget {
     required this.onToggle,
     this.onOpen,
     this.onAllHabits,
-    this.onAdd,
     this.expand = false,
   });
   final List<Map<String, Object?>> habits;
@@ -592,7 +558,6 @@ class _HabitsCard extends StatelessWidget {
   final Future<void> Function(String id, bool done) onToggle;
   final Future<void> Function(String id)? onOpen;
   final VoidCallback? onAllHabits;
-  final VoidCallback? onAdd;
   final bool expand;
 
   @override
@@ -619,19 +584,9 @@ class _HabitsCard extends StatelessWidget {
       ),
       expand: expand,
       child: habits.isEmpty
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'No habits yet. Add one to check in daily.',
-                  style: _TodayChrome.rowSubtitle(),
-                ),
-                const SizedBox(height: 8),
-                FilledButton.tonal(
-                  onPressed: onAdd,
-                  child: const Text('New habit'),
-                ),
-              ],
+          ? Text(
+              'No habits yet. Use All habits to add one.',
+              style: _TodayChrome.rowSubtitle(),
             )
           : expand
               ? list
@@ -952,8 +907,81 @@ class _FamilyTodayCardState extends State<_FamilyTodayCard> {
   }
 }
 
+class _Last7DaysHeader extends StatelessWidget {
+  const _Last7DaysHeader();
+
+  Future<void> _openLegend(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: BodylineColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: BodylineColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Week grid key',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                const _WeekLegend(alignStart: true),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            'Last 7 days',
+            style: _TodayChrome.sectionTitle(context),
+          ),
+        ),
+        IconButton(
+          tooltip: 'What the colours mean',
+          onPressed: () => _openLegend(context),
+          visualDensity: VisualDensity.compact,
+          icon: Icon(
+            Icons.info_outline,
+            size: 20,
+            color: BodylineColors.inkSubtle,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _WeekLegend extends StatelessWidget {
-  const _WeekLegend();
+  const _WeekLegend({this.alignStart = false});
+
+  final bool alignStart;
 
   @override
   Widget build(BuildContext context) {
@@ -984,8 +1012,8 @@ class _WeekLegend extends StatelessWidget {
 
     return Wrap(
       spacing: 12,
-      runSpacing: 6,
-      alignment: WrapAlignment.end,
+      runSpacing: 8,
+      alignment: alignStart ? WrapAlignment.start : WrapAlignment.end,
       children: [
         item(
           BodylineColors.teal,
@@ -1174,19 +1202,9 @@ class _WeekGrid extends StatelessWidget {
     ];
 
     final chrome = showSectionChrome
-        ? Padding(
-            padding: const EdgeInsets.only(bottom: _TodayChrome.sectionGap),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Last 7 days',
-                  style: _TodayChrome.sectionTitle(context),
-                ),
-                const SizedBox(width: 16),
-                const Expanded(child: _WeekLegend()),
-              ],
-            ),
+        ? const Padding(
+            padding: EdgeInsets.only(bottom: _TodayChrome.sectionGap),
+            child: _Last7DaysHeader(),
           )
         : const SizedBox.shrink();
 

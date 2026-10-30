@@ -43,6 +43,85 @@ void _flushDraftMedication({
   instructions.clear();
 }
 
+
+Future<void> _promptLinkExistingMedications({
+  required BuildContext context,
+  required List<MedicalItem> available,
+  required void Function(List<MedicalItem> picked) onPicked,
+}) async {
+  if (available.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('No other medicines on this profile to link.'),
+      ),
+    );
+    return;
+  }
+  final selected = <String>{};
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setLocal) {
+        return AlertDialog(
+          title: const Text('Link existing medicine'),
+          content: SizedBox(
+            width: 400,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final m in available)
+                  CheckboxListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    value: selected.contains(m.id),
+                    title: Text(
+                      [
+                        m.title,
+                        if (m.strength != null && m.strength!.trim().isNotEmpty)
+                          m.strength!,
+                      ].join(' · '),
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    subtitle: (m.visitId != null && m.visitId!.isNotEmpty)
+                        ? Text(
+                            'Linked to another visit — will move here',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: BodylineColors.inkSubtle,
+                            ),
+                          )
+                        : null,
+                    onChanged: (v) => setLocal(() {
+                      if (v == true) {
+                        selected.add(m.id);
+                      } else {
+                        selected.remove(m.id);
+                      }
+                    }),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: selected.isEmpty
+                  ? null
+                  : () => Navigator.pop(ctx, true),
+              child: const Text('Link'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+  if (ok != true) return;
+  onPicked([for (final m in available) if (selected.contains(m.id)) m]);
+}
+
 /// Shared Add visit dialog (Visits page + Doctors detail).
 /// Returns true when a visit was saved.
 
@@ -106,6 +185,8 @@ Future<bool> promptAddVisit(
     DateTime? followUp;
     final pending = <PendingClinicalFile>[];
     final pendingMeds = <({String name, String? strength, String? instructions})>[];
+    final profileMeds = await store.listMedications(pid);
+    final linkedExisting = <MedicalItem>[];
     String? doctorChoice;
     if (prefillDoctor != null && prefillDoctor.trim().isNotEmpty) {
       final pref = prefillDoctor.trim();
@@ -367,28 +448,84 @@ Future<bool> promptAddVisit(
                       );
                     },
                   ),
+                  if (linkedExisting.isNotEmpty)
+                    for (final m in List<MedicalItem>.from(linkedExisting))
+                      ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                          [
+                            m.title,
+                            if (m.strength != null) m.strength!,
+                          ].join(' · '),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        subtitle: Text(
+                          'From Medicines',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: BodylineColors.inkSubtle,
+                          ),
+                        ),
+                        trailing: IconButton(
+                          tooltip: 'Unlink',
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () => setLocal(
+                            () => linkedExisting.removeWhere((x) => x.id == m.id),
+                          ),
+                        ),
+                      ),
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: () {
-                        final n = medName.text.trim();
-                        if (n.isEmpty) return;
-                        setLocal(() {
-                          pendingMeds.add((
-                            name: n,
-                            strength: medStrength.text.trim().isEmpty
-                                ? null
-                                : medStrength.text.trim(),
-                            instructions: medInstructions.text.trim().isEmpty
-                                ? null
-                                : medInstructions.text.trim(),
-                          ));
-                          medName.clear();
-                          medStrength.clear();
-                          medInstructions.clear();
-                        });
-                      },
-                      child: const Text('Add medication to list'),
+                    child: Wrap(
+                      spacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            final n = medName.text.trim();
+                            if (n.isEmpty) return;
+                            setLocal(() {
+                              pendingMeds.add((
+                                name: n,
+                                strength: medStrength.text.trim().isEmpty
+                                    ? null
+                                    : medStrength.text.trim(),
+                                instructions: medInstructions.text.trim().isEmpty
+                                    ? null
+                                    : medInstructions.text.trim(),
+                              ));
+                              medName.clear();
+                              medStrength.clear();
+                              medInstructions.clear();
+                            });
+                          },
+                          child: const Text('Add medication to list'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            final exclude = {
+                              for (final m in linkedExisting) m.id,
+                            };
+                            final available = [
+                              for (final m in profileMeds)
+                                if (!exclude.contains(m.id)) m,
+                            ];
+                            _promptLinkExistingMedications(
+                              context: ctx,
+                              available: available,
+                              onPicked: (picked) => setLocal(() {
+                                final have = {
+                                  for (final m in linkedExisting) m.id,
+                                };
+                                for (final m in picked) {
+                                  if (have.add(m.id)) linkedExisting.add(m);
+                                }
+                              }),
+                            );
+                          },
+                          child: const Text('Link existing'),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -458,6 +595,9 @@ Future<bool> promptAddVisit(
         visitId: visit.id,
       );
     }
+    for (final m in linkedExisting) {
+      await store.setMedicationVisitId(id: m.id, visitId: visit.id);
+    }
 
     await _wireVisitFollowUpReminder(
       store: store,
@@ -521,6 +661,8 @@ Future<VisitRecord?> promptEditVisit(
   if (!context.mounted) return null;
   var savedAtts = List<AttachmentRecord>.from(existingAtts);
   var savedMeds = List<MedicalItem>.from(existingMeds);
+  final profileMeds = await store.listMedications(pid);
+  final linkMeds = <MedicalItem>[];
   final removeAttIds = <String>{};
   final removeMedIds = <String>{};
   String? doctorChoice;
@@ -750,7 +892,7 @@ Future<VisitRecord?> promptEditVisit(
                         style: const TextStyle(fontSize: 13),
                       ),
                       trailing: IconButton(
-                        tooltip: 'Remove',
+                        tooltip: 'Unlink from visit',
                         icon: const Icon(Icons.close, size: 18),
                         onPressed: () => setLocal(() {
                           savedMeds.removeWhere((x) => x.id == m.id);
@@ -823,28 +965,83 @@ Future<VisitRecord?> promptEditVisit(
                     );
                   },
                 ),
+                if (linkMeds.isNotEmpty)
+                  for (final m in List<MedicalItem>.from(linkMeds))
+                    ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        [
+                          m.title,
+                          if (m.strength != null) m.strength!,
+                        ].join(' · '),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      subtitle: Text(
+                        'From Medicines',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: BodylineColors.inkSubtle,
+                        ),
+                      ),
+                      trailing: IconButton(
+                        tooltip: 'Unlink',
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () => setLocal(
+                          () => linkMeds.removeWhere((x) => x.id == m.id),
+                        ),
+                      ),
+                    ),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    onPressed: () {
-                      final n = medName.text.trim();
-                      if (n.isEmpty) return;
-                      setLocal(() {
-                        pendingMeds.add((
-                          name: n,
-                          strength: medStrength.text.trim().isEmpty
-                              ? null
-                              : medStrength.text.trim(),
-                          instructions: medInstructions.text.trim().isEmpty
-                              ? null
-                              : medInstructions.text.trim(),
-                        ));
-                        medName.clear();
-                        medStrength.clear();
-                        medInstructions.clear();
-                      });
-                    },
-                    child: const Text('Add medication to list'),
+                  child: Wrap(
+                    spacing: 8,
+                    children: [
+                      TextButton(
+                        onPressed: () {
+                          final n = medName.text.trim();
+                          if (n.isEmpty) return;
+                          setLocal(() {
+                            pendingMeds.add((
+                              name: n,
+                              strength: medStrength.text.trim().isEmpty
+                                  ? null
+                                  : medStrength.text.trim(),
+                              instructions: medInstructions.text.trim().isEmpty
+                                  ? null
+                                  : medInstructions.text.trim(),
+                            ));
+                            medName.clear();
+                            medStrength.clear();
+                            medInstructions.clear();
+                          });
+                        },
+                        child: const Text('Add medication to list'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          final exclude = {
+                            for (final m in savedMeds) m.id,
+                            for (final m in linkMeds) m.id,
+                          };
+                          final available = [
+                            for (final m in profileMeds)
+                              if (!exclude.contains(m.id)) m,
+                          ];
+                          _promptLinkExistingMedications(
+                            context: ctx,
+                            available: available,
+                            onPicked: (picked) => setLocal(() {
+                              final have = {for (final m in linkMeds) m.id};
+                              for (final m in picked) {
+                                if (have.add(m.id)) linkMeds.add(m);
+                              }
+                            }),
+                          );
+                        },
+                        child: const Text('Link existing'),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -916,13 +1113,7 @@ Future<VisitRecord?> promptEditVisit(
 
   for (final id in removeMedIds) {
     try {
-      await store.softDeleteMedication(id);
-    } catch (_) {}
-  }
-  if (removeMedIds.isNotEmpty) {
-    try {
-      final schedules = await store.listAllMedicationSchedules();
-      await ReminderNotifications.instance.rescheduleAllDoses(schedules);
+      await store.setMedicationVisitId(id: id, visitId: null);
     } catch (_) {}
   }
 
@@ -937,6 +1128,13 @@ Future<VisitRecord?> promptEditVisit(
         instructions: m.instructions,
         visitId: visit.id,
       );
+    } catch (_) {
+      medError = true;
+    }
+  }
+  for (final m in linkMeds) {
+    try {
+      await store.setMedicationVisitId(id: m.id, visitId: visit.id);
     } catch (_) {
       medError = true;
     }

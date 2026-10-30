@@ -146,6 +146,23 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Add-Content -Path $env:GITHUB_ENV -Value "VITALOG_INSTALLER=$env:GITHUB_WORKSPACE\Vitalog-$version-setup.exe"
 
+      - name: Pack Windows MSIX (Store)
+        if: matrix.platform == 'windows'
+        working-directory: app
+        shell: pwsh
+        run: |
+          # Requires msix_config.publisher from Partner Center (not REPLACE_...).
+          $pub = (Select-String -Path pubspec.yaml -Pattern '^\s*publisher:\s*(.+)$').Matches[0].Groups[1].Value.Trim()
+          if ($pub -match 'REPLACE_WITH_PARTNER_CENTER') {
+            Write-Host 'Skipping MSIX: set msix_config.publisher from Partner Center Product identity.'
+            exit 0
+          }
+          dart run msix:create --store
+          $msix = Get-ChildItem -Recurse -Filter *.msix | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $msix) { throw 'MSIX not produced' }
+          Copy-Item $msix.FullName "$env:GITHUB_WORKSPACE\$($msix.Name)"
+          Add-Content -Path $env:GITHUB_ENV -Value "VITALOG_MSIX=$env:GITHUB_WORKSPACE\$($msix.Name)"
+
       - name: Build Linux
         if: matrix.platform == 'linux'
         working-directory: app
@@ -198,6 +215,14 @@ jobs:
           path: ${{ env.VITALOG_INSTALLER }}
           archive: false
           if-no-files-found: error
+
+      - name: Upload Windows MSIX
+        if: matrix.platform == 'windows' && env.VITALOG_MSIX != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          path: ${{ env.VITALOG_MSIX }}
+          archive: false
+          if-no-files-found: warn
 
       - name: Upload Linux
         if: matrix.platform == 'linux'

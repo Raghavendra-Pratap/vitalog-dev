@@ -32,7 +32,8 @@ Future<void> main() async {
   final sync = LanSyncService(store);
   await sync.init();
   await ReminderNotifications.instance.init();
-  ReminderNotifications.instance.onDoseAction = (action, medicationId, timeHm) async {
+  ReminderNotifications.instance.onDoseAction =
+      (action, medicationId, timeHm) async {
     try {
       final parts = timeHm.split(':');
       final h = int.tryParse(parts[0]) ?? 0;
@@ -75,12 +76,20 @@ Future<void> main() async {
     for (final profile in store.profiles) {
       all.addAll(await store.rollForwardRecurring(profile.id));
     }
-    await ReminderNotifications.instance.rescheduleAll(all);
     final doses = await store.listAllMedicationSchedules();
-    await ReminderNotifications.instance.rescheduleAllDoses(doses);
     final habits = await store.listAllHabits();
+    final needsAlerts = all.isNotEmpty || doses.isNotEmpty || habits.any((h) {
+      return ((h['reminder_enabled'] as int?) ?? 0) == 1;
+    });
+    if (needsAlerts) {
+      await ReminderNotifications.instance.ensurePermission();
+    }
+    await ReminderNotifications.instance.rescheduleAll(all);
+    await ReminderNotifications.instance.rescheduleAllDoses(doses);
     await ReminderNotifications.instance.rescheduleAllHabits(habits);
-  } catch (_) {}
+  } catch (e, st) {
+    debugPrint('Vitalog: failed to reschedule alerts: $e\n$st');
+  }
   runApp(BodylineApp(store: store, lock: lock, theme: theme, sync: sync));
 }
 
@@ -115,6 +124,9 @@ class _BodylineAppState extends State<BodylineApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     widget.sync.startAutoSync();
     _listenPairLinks();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(nudgeWindowsSurface());
+    });
   }
 
   Future<void> _listenPairLinks() async {
@@ -161,7 +173,6 @@ class _BodylineAppState extends State<BodylineApp> with WidgetsBindingObserver {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final store = widget.store;
@@ -170,7 +181,8 @@ class _BodylineAppState extends State<BodylineApp> with WidgetsBindingObserver {
     final lightTheme = bodylineTheme(Brightness.light);
     final darkTheme = bodylineTheme(Brightness.dark);
     final mode = widget.theme.mode;
-    final platform = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    final platform =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
     final active = switch (mode) {
       ThemeMode.light => Brightness.light,
       ThemeMode.dark => Brightness.dark,

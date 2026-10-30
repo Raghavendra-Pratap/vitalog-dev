@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../notifications/reminder_notifications.dart';
@@ -66,7 +67,8 @@ class DoseWaitController extends ChangeNotifier {
   final _Clock _cd = _Clock();
   final _Clock _sw = _Clock();
   DoseWaitMode _header = DoseWaitMode.countdown;
-  Timer? _tick;
+  Ticker? _uiTicker;
+  DateTime? _lastPaint;
 
   /// Clock shown in the shell header.
   DoseWaitMode get mode => _header;
@@ -151,8 +153,7 @@ class DoseWaitController extends ChangeNotifier {
         ? null
         : DateTime.fromMillisecondsSinceEpoch(swStarted);
     final frozen = prefs.getInt(_swFrozen);
-    _sw.frozenElapsed =
-        frozen == null ? null : Duration(milliseconds: frozen);
+    _sw.frozenElapsed = frozen == null ? null : Duration(milliseconds: frozen);
   }
 
   void _migrateLegacy(SharedPreferences prefs) {
@@ -191,11 +192,17 @@ class DoseWaitController extends ChangeNotifier {
     _cd.label = label;
     _cd.running = true;
     _header = DoseWaitMode.countdown;
-    await _persist();
-    await ReminderNotifications.instance.ensurePermission();
-    await ReminderNotifications.instance.scheduleDoseWait(endsAt: _cd.endsAt!);
     _syncTick();
     notifyListeners();
+    unawaited(_armCountdownAlert());
+  }
+
+  Future<void> _armCountdownAlert() async {
+    await _persist();
+    if (!_cd.running || _cd.endsAt == null) return;
+    await ReminderNotifications.instance.ensurePermission();
+    if (!_cd.running || _cd.endsAt == null) return;
+    await ReminderNotifications.instance.scheduleDoseWait(endsAt: _cd.endsAt!);
   }
 
   Future<void> startStopwatch({String? label}) async {
@@ -208,9 +215,9 @@ class DoseWaitController extends ChangeNotifier {
     _sw.lastLapOverall = Duration.zero;
     _sw.frozenElapsed = null;
     _header = DoseWaitMode.stopwatch;
-    await _persist();
     _syncTick();
     notifyListeners();
+    unawaited(_persist());
   }
 
   void showHeader(DoseWaitMode mode) {
@@ -247,7 +254,8 @@ class DoseWaitController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> stopCountdown() => _clearCountdown(notifyOs: true, persist: true);
+  Future<void> stopCountdown() =>
+      _clearCountdown(notifyOs: true, persist: true);
 
   Future<void> stopStopwatch() async {
     if (!_sw.running || _sw.startedAt == null) return;
@@ -255,16 +263,16 @@ class DoseWaitController extends ChangeNotifier {
     _sw.running = false;
     _ensureHeader();
     _syncTick();
-    await _persist();
     notifyListeners();
+    unawaited(_persist());
   }
 
   Future<void> resetStopwatch() async {
     _sw.reset();
     _ensureHeader();
     _syncTick();
-    await _persist();
     notifyListeners();
+    unawaited(_persist());
   }
 
   /// Stops the header clock. Prefer [stopCountdown] / [stopStopwatch].
@@ -292,11 +300,11 @@ class DoseWaitController extends ChangeNotifier {
     _cd.reset();
     _ensureHeader();
     _syncTick();
-    if (persist) await _persist();
-    if (notifyOs) {
-      await ReminderNotifications.instance.cancelDoseWait();
-    }
     if (persist) notifyListeners();
+    if (persist) unawaited(_persist());
+    if (notifyOs) {
+      unawaited(ReminderNotifications.instance.cancelDoseWait());
+    }
   }
 
   void _ensureHeader() {
@@ -363,21 +371,46 @@ class DoseWaitController extends ChangeNotifier {
   }
 
   void _syncTick() {
-    _tick?.cancel();
-    _tick = null;
-    if (!_cd.running && !_sw.running) return;
-    final period = _sw.running
-        ? const Duration(milliseconds: 50)
-        : const Duration(seconds: 1);
-    _tick = Timer.periodic(period, (_) async {
-      if (_cd.running &&
-          _cd.endsAt != null &&
-          !DateTime.now().isBefore(_cd.endsAt!)) {
-        await _clearCountdown(notifyOs: false, persist: true);
-        return;
-      }
+    final active = _cd.running || _sw.running;
+    if (!active) {
+      _uiTicker?.stop();
+      _lastPaint = null;
+      return;
+    }
+    _uiTicker ??= Ticker(_onUiTick);
+    if (!_uiTicker!.isActive) _uiTicker!.start();
+  }
+
+  void _safeNotify() {
+    if (!hasListeners) return;
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    // Avoid notifying while the tree is locking/unlocking inherited widgets
+    // (can trip InheritedElement '_dependents.isEmpty' during route changes).
+    if (phase == SchedulerPhase.idle ||
+        phase == SchedulerPhase.postFrameCallbacks) {
       notifyListeners();
+      return;
+    }
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (hasListeners) notifyListeners();
     });
+  }
+
+  void _onUiTick(Duration _) {
+    final now = DateTime.now();
+    if (_cd.running && _cd.endsAt != null && !now.isBefore(_cd.endsAt!)) {
+      unawaited(_clearCountdown(notifyOs: false, persist: true));
+      return;
+    }
+    // A plain Timer does not paint while this screen is idle. The ticker
+    // asks for frames; the gap keeps the readout cheap.
+    final gap = _sw.running ? 80 : 200;
+    if (_lastPaint != null &&
+        now.difference(_lastPaint!).inMilliseconds < gap) {
+      return;
+    }
+    _lastPaint = now;
+    _safeNotify();
   }
 
   static String formatDuration(Duration d) {

@@ -14,11 +14,11 @@ void main() {
 
   test('a newer release points at the installer for this system', () {
     const body = '{'
-        '"tag_name":"v0.2.7",'
+        '"tag_name":"v0.2.9",'
         '"assets":['
-        '{"name":"Vitalog-0.2.7.dmg","browser_download_url":"https://example.test/Vitalog.dmg"},'
+        '{"name":"Vitalog-0.2.9.dmg","browser_download_url":"https://example.test/Vitalog.dmg"},'
         '{"name":"Vitalog-0.2.7-setup.exe","browser_download_url":"https://example.test/setup.exe"},'
-        '{"name":"Vitalog-0.2.7.deb","browser_download_url":"https://example.test/vitalog.deb"}'
+        '{"name":"Vitalog-0.2.9.deb","browser_download_url":"https://example.test/vitalog.deb"}'
         ']}';
     final mac = interpretRelease(
       current: '0.2.6',

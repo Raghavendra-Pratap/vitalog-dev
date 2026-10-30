@@ -134,9 +134,8 @@ class _CustomizeBodySheetState extends State<_CustomizeBodySheet> {
                           color: BodylineColors.inkSubtle,
                         ),
                       ),
-                      trailing: Switch.adaptive(
+                      trailing: Switch(
                         value: on,
-                        activeTrackColor: BodylineColors.teal,
                         onChanged: (v) {
                           setState(() {
                             if (v) {

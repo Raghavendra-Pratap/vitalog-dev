@@ -15,6 +15,7 @@ import 'package:file_picker/file_picker.dart';
 import '../../security/app_lock.dart';
 import '../../theme/theme_controller.dart';
 import '../../theme/tokens.dart';
+import '../medicines/dose_wait_header_chip.dart';
 import '../../widgets/bodyline_dialog.dart';
 import '../../sync/lan_sync_service.dart';
 import '../sync/sync_screen.dart';
@@ -240,7 +241,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final canPop = ModalRoute.of(context)?.canPop ?? false;
     return Scaffold(
       appBar: (!widget.desktop || canPop)
-          ? AppBar(title: const Text('Settings'))
+          ? AppBar(
+        title: const Text('Settings'),
+        actions: doseWaitActions(),
+      )
           : null,
       backgroundColor: BodylineColors.paper,
       body: ListenableBuilder(

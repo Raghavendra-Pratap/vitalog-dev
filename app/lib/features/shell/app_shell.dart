@@ -13,9 +13,6 @@ import '../profile/profile_screen.dart';
 import '../tests/tests_screen.dart';
 import '../records/records_screen.dart';
 import 'desktop_shell.dart';
-import '../medicines/dose_wait_controller.dart';
-import '../medicines/dose_wait_header_chip.dart';
-import '../medicines/dose_wait_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({
@@ -63,43 +60,35 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     BodylineColors.syncFrom(context);
     if (useWideShell(context)) {
-      return DesktopShell(store: widget.store, lock: widget.lock, theme: widget.theme, sync: widget.sync);
+      return DesktopShell(
+          store: widget.store,
+          lock: widget.lock,
+          theme: widget.theme,
+          sync: widget.sync);
     }
 
     final store = widget.store;
-    // Hide shell FAB on Profile (Records uses shell Add for new report).
-    final hideFab = _tab == 3;
+    // Hide FAB on Home (crowded) and Profile (has its own Add). Records uses shell Add.
+    final hideFab = _tab == 0 || _tab == 3;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Stack(
+      body: IndexedStack(
+        index: _tab,
         children: [
-          IndexedStack(
-            index: _tab,
-            children: [
-              HomeScreen(store: store, onChanged: _refresh),
-              TestsScreen(store: store, onChanged: _refresh),
-              RecordsScreen(
-                store: store,
-                onAdd: () {
-                  _openAdd();
-                },
-              ),
-              ProfileScreen(store: store, onChanged: _refresh, lock: widget.lock, theme: widget.theme, sync: widget.sync),
-            ],
+          HomeScreen(store: store, onChanged: _refresh),
+          TestsScreen(store: store, onChanged: _refresh),
+          RecordsScreen(
+            store: store,
+            onAdd: () {
+              _openAdd();
+            },
           ),
-          Positioned(
-            top: MediaQuery.paddingOf(context).top + 4,
-            right: 12,
-            child: DoseWaitHeaderChip(
-              onOpen: () {
-                final mode = DoseWaitController.instance.mode;
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => DoseWaitScreen(mode: mode),
-                  ),
-                );
-              },
-            ),
+          ProfileScreen(
+            store: store,
+            onChanged: _refresh,
+            lock: widget.lock,
+            theme: widget.theme,
+            sync: widget.sync,
           ),
         ],
       ),
@@ -109,8 +98,6 @@ class _AppShellState extends State<AppShell> {
               heroTag: 'shell-add-report-fab',
               onPressed: _openAdd,
               tooltip: 'Add report',
-              backgroundColor: BodylineColors.ink,
-              foregroundColor: BodylineColors.onInk,
               child: const Icon(Icons.add),
             ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,

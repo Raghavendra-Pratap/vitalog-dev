@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:bodyline_core/bodyline_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
@@ -21,9 +22,14 @@ import '../features/import/lab_parse_quality.dart';
 import '../features/import/ocr_normalize.dart';
 
 /// On-device persistence — SQLCipher user.db (ADR-001).
-class LocalStore with MedicalStoreMixin, BlobVaultMixin, CareStoreMixin, HabitsNotesStoreMixin {
+class LocalStore extends ChangeNotifier
+    with
+        MedicalStoreMixin,
+        BlobVaultMixin,
+        CareStoreMixin,
+        HabitsNotesStoreMixin {
   LocalStore({SecureKeys? secureKeys, this.documentsDirectory})
-      : secureKeys = secureKeys ?? SecureKeys();
+    : secureKeys = secureKeys ?? SecureKeys();
 
   /// Isolated vault root. Null uses the normal documents directory.
   /// A set directory skips the one-time copy from the old Mac container.
@@ -61,7 +67,8 @@ class LocalStore with MedicalStoreMixin, BlobVaultMixin, CareStoreMixin, HabitsN
     // One-time wipe of M0 plaintext user.db before switching to SQLCipher.
     if (await userFile.exists() && !await plainMarker.exists()) {
       final header = await userFile.openRead(0, 16).first;
-      final isPlain = String.fromCharCodes(header).startsWith('SQLite format 3');
+      final isPlain = String.fromCharCodes(header)
+          .startsWith('SQLite format 3');
       if (isPlain) {
         await userFile.delete();
         await plainMarker.writeAsString(
@@ -117,7 +124,6 @@ CREATE TABLE IF NOT EXISTS attachment (
     await reload();
   }
 
-
   Future<void> close() async {
     await _user?.close();
     await _catalog?.close();
@@ -160,13 +166,18 @@ CREATE TABLE IF NOT EXISTS attachment (
     );
     reports
       ..clear()
-      ..addAll(reportRows.map((r) => ReportRecord(
+      ..addAll(
+        reportRows.map(
+          (r) => ReportRecord(
             id: r['id']! as String,
             profileId: r['profile_id']! as String,
             title: (r['title'] as String?) ?? 'Report',
-            collectedAt:
-                DateTime.fromMillisecondsSinceEpoch(r['collected_at']! as int),
-          )));
+            collectedAt: DateTime.fromMillisecondsSinceEpoch(
+              r['collected_at']! as int,
+            ),
+          ),
+        ),
+      );
 
     final obsRows = await db.query(
       'observation',
@@ -185,8 +196,9 @@ CREATE TABLE IF NOT EXISTS attachment (
           reportId: (r['report_id'] as String?) ?? '',
           parameterCode: code,
           parameterName: name,
-          observedAt:
-              DateTime.fromMillisecondsSinceEpoch(r['observed_at']! as int),
+          observedAt: DateTime.fromMillisecondsSinceEpoch(
+            r['observed_at']! as int,
+          ),
           valueReported: r['value_reported']! as String,
           unitReported: (r['unit_reported'] as String?) ?? '',
           valueNum: (r['value_num'] as num?)?.toDouble(),
@@ -199,12 +211,10 @@ CREATE TABLE IF NOT EXISTS attachment (
       );
     }
     await syncProfileHeightFromObservations();
+    notifyListeners();
   }
 
-  Future<String?> _parameterName(
-    String code,
-    Map<String, String> cache,
-  ) async {
+  Future<String?> _parameterName(String code, Map<String, String> cache) async {
     if (cache.containsKey(code)) return cache[code];
     final rows = await _catalog!.query(
       'parameter',
@@ -224,23 +234,27 @@ CREATE TABLE IF NOT EXISTS attachment (
     String relation = 'self',
     String? sex,
     String? dob,
+    String? bloodGroup,
+    double? heightCm,
+    String? id,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    final id = _uuid.v4();
+    final profileId = id ?? _uuid.v4();
     final hlc = '$now-0-local';
     final profile = ProfileRecord(
-      id: id,
+      id: profileId,
       name: name,
       relation: relation,
       sex: sex,
       dob: dob,
+      bloodGroup: bloodGroup,
+      heightCm: heightCm,
     );
     await _user!.insert('profile', profile.toRow(nowMs: now, hlc: hlc));
-    await _user!.insert(
-      'local_device',
-      {'device_id': 'device-local', 'hlc_last': hlc},
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    await _user!.insert('local_device', {
+      'device_id': 'device-local',
+      'hlc_last': hlc,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
     profiles.add(profile);
     activeProfileId ??= profile.id;
     return profile;
@@ -264,7 +278,9 @@ CREATE TABLE IF NOT EXISTS attachment (
       throw StateError('Profile not found');
     }
     final existing = profiles[i];
-    final nextName = (name == null || name.trim().isEmpty) ? existing.name : name.trim();
+    final nextName = (name == null || name.trim().isEmpty)
+        ? existing.name
+        : name.trim();
     final updated = existing.copyWith(
       name: nextName,
       relation: relation,
@@ -322,7 +338,6 @@ CREATE TABLE IF NOT EXISTS attachment (
     }
   }
 
-
   /// Standing height in cm from an observation (cm / in / m).
   static double? heightCmFromObservation(ObservationRecord o) {
     final n = o.valueNum ?? double.tryParse(o.valueReported.trim());
@@ -331,7 +346,11 @@ CREATE TABLE IF NOT EXISTS attachment (
     if (u == 'in' || u == 'inch' || u == 'inches' || u == '"') {
       return n * 2.54;
     }
-    if (u == 'm' || u == 'meter' || u == 'meters' || u == 'metre' || u == 'metres') {
+    if (u == 'm' ||
+        u == 'meter' ||
+        u == 'meters' ||
+        u == 'metre' ||
+        u == 'metres') {
       return n * 100;
     }
     // Bare metres are rare on Indian labs; values under 3 without unit → metres.
@@ -397,7 +416,6 @@ CREATE TABLE IF NOT EXISTS attachment (
       source: 'manual',
     );
   }
-
 
   Future<ReportRecord?> addManualPanel({
     required String profileId,
@@ -483,10 +501,10 @@ CREATE TABLE IF NOT EXISTS attachment (
           'ref_bands_json': encodeRefBandsJson(bands),
           'ref_source':
               (low != null ||
-                      high != null ||
-                      (bands != null && bands.isNotEmpty))
-                  ? 'lab'
-                  : 'none',
+                  high != null ||
+                  (bands != null && bands.isNotEmpty))
+              ? 'lab'
+              : 'none',
           'flag': flagToDb(flag),
           'flag_source': flag == null ? null : 'computed',
           'source': v.source,
@@ -554,9 +572,7 @@ CREATE TABLE IF NOT EXISTS attachment (
     final nextUnit = unitReported ?? existing.unitReported;
     var nextLow = clearRefs ? null : (refLow ?? existing.refLow);
     var nextHigh = clearRefs ? null : (refHigh ?? existing.refHigh);
-    final nextBands = clearBands
-        ? null
-        : (refBands ?? existing.refBands);
+    final nextBands = clearBands ? null : (refBands ?? existing.refBands);
     if (nextBands != null && nextBands.isNotEmpty) {
       final env = envelopeFromBands(nextBands);
       nextLow ??= env.low;
@@ -586,10 +602,10 @@ CREATE TABLE IF NOT EXISTS attachment (
         'ref_bands_json': encodeRefBandsJson(nextBands),
         'ref_source':
             (nextLow != null ||
-                    nextHigh != null ||
-                    (nextBands != null && nextBands.isNotEmpty))
-                ? 'lab'
-                : 'none',
+                nextHigh != null ||
+                (nextBands != null && nextBands.isNotEmpty))
+            ? 'lab'
+            : 'none',
         'flag': flagToDb(flag),
         'flag_source': flag == null ? null : 'computed',
         'verified': 1,
@@ -630,11 +646,7 @@ CREATE TABLE IF NOT EXISTS attachment (
     await db.transaction((txn) async {
       await txn.update(
         'report',
-        {
-          'collected_at': collectedMs,
-          'updated_at': now,
-          'hlc': hlc,
-        },
+        {'collected_at': collectedMs, 'updated_at': now, 'hlc': hlc},
         where: 'id = ? AND deleted = 0',
         whereArgs: [reportId],
       );
@@ -683,10 +695,10 @@ CREATE TABLE IF NOT EXISTS attachment (
               'ref_bands_json': encodeRefBandsJson(bands),
               'ref_source':
                   (low != null ||
-                          high != null ||
-                          (bands != null && bands.isNotEmpty))
-                      ? 'lab'
-                      : 'none',
+                      high != null ||
+                      (bands != null && bands.isNotEmpty))
+                  ? 'lab'
+                  : 'none',
               'flag': flagToDb(flag),
               'flag_source': flag == null ? null : 'computed',
               'verified': 1,
@@ -716,10 +728,10 @@ CREATE TABLE IF NOT EXISTS attachment (
             'ref_bands_json': encodeRefBandsJson(bands),
             'ref_source':
                 (low != null ||
-                        high != null ||
-                        (bands != null && bands.isNotEmpty))
-                    ? 'lab'
-                    : 'none',
+                    high != null ||
+                    (bands != null && bands.isNotEmpty))
+                ? 'lab'
+                : 'none',
             'flag': flagToDb(flag),
             'flag_source': flag == null ? null : 'computed',
             'source': 'manual',
@@ -741,70 +753,52 @@ CREATE TABLE IF NOT EXISTS attachment (
     await syncProfileHeightFromObservations(report.profileId);
   }
 
-  Future<List<Map<String, Object?>>> _activeTableRows(String table) async {
-    return userDb.query(table, where: 'deleted = 0');
+  /// All rows for LAN sync, including soft-deletes so peers can drop them.
+  Future<List<Map<String, Object?>>> _syncTableRows(String table) async {
+    return userDb.query(table);
   }
 
   /// Full vault map for LAN sync (labs + care: doctors, visits, medicines, …).
   Future<Map<String, Object?>> exportVaultMap() async {
+    final profileRows = await _syncTableRows('profile');
     return {
       'exported_at': DateTime.now().toIso8601String(),
       'format': 'bodyline-export-v1',
       'active_profile_id': activeProfileId,
       'profiles': [
-        for (final pr in profiles)
+        for (final r in profileRows)
           {
-            'id': pr.id,
-            'name': pr.name,
-            'relation': pr.relation,
-            'sex': pr.sex,
-            'dob': pr.dob,
+            'id': r['id'],
+            'name': r['name'],
+            'relation': r['relation'],
+            'sex': r['sex'],
+            'dob': r['dob'],
+            'blood_group': r['blood_group'],
+            'height_cm': r['height_cm'],
+            'updated_at': r['updated_at'],
+            'deleted': r['deleted'],
           },
       ],
-      'reports': [
-        for (final r in reports)
-          {
-            'id': r.id,
-            'profile_id': r.profileId,
-            'title': r.title,
-            'collected_at': r.collectedAt.toIso8601String(),
-          },
-      ],
-      'observations': [
-        for (final o in observations)
-          {
-            'id': o.id,
-            'profile_id': o.profileId,
-            'report_id': o.reportId,
-            'parameter_code': o.parameterCode,
-            'parameter_name': o.parameterName,
-            'observed_at': o.observedAt.toIso8601String(),
-            'value_reported': o.valueReported,
-            'unit_reported': o.unitReported,
-            'value_num': o.valueNum,
-            'ref_low': o.refLow,
-            'ref_high': o.refHigh,
-            'ref_bands_json': encodeRefBandsJson(o.refBands),
-            'flag': flagToDb(o.flag),
-          },
-      ],
-      'providers': await _activeTableRows('provider'),
-      'visits': await _activeTableRows('visit'),
-      'medications': await _activeTableRows('medication'),
-      'medication_schedules': await _activeTableRows('medication_schedule'),
-      'reminders': await _activeTableRows('reminder'),
-      'conditions': await _activeTableRows('condition'),
-      'allergies': await _activeTableRows('allergy'),
-      'immunizations': await _activeTableRows('immunization'),
-      'procedures': await _activeTableRows('procedure_record'),
-      'family_history': await _activeTableRows('family_history'),
-      'emergency_contacts': await _activeTableRows('emergency_contact'),
-      'medication_logs': await _activeTableRows('medication_log'),
-      'attachments': await _activeTableRows('attachment'),
+      // Full DB rows so HC external_id, flags, and soft-deletes round-trip.
+      'reports': await _syncTableRows('report'),
+      'observations': await _syncTableRows('observation'),
+      'providers': await _syncTableRows('provider'),
+      'visits': await _syncTableRows('visit'),
+      'medications': await _syncTableRows('medication'),
+      'medication_schedules': await _syncTableRows('medication_schedule'),
+      'reminders': await _syncTableRows('reminder'),
+      'conditions': await _syncTableRows('condition'),
+      'allergies': await _syncTableRows('allergy'),
+      'immunizations': await _syncTableRows('immunization'),
+      'procedures': await _syncTableRows('procedure_record'),
+      'family_history': await _syncTableRows('family_history'),
+      'emergency_contacts': await _syncTableRows('emergency_contact'),
+      'medication_logs': await _syncTableRows('medication_log'),
+      'attachments': await _syncTableRows('attachment'),
       'blob_files': await _exportBlobFiles(),
-      'habits': await _activeTableRows('habit'),
-      'habit_logs': await _activeTableRows('habit_log'),
-      'notes': await _activeTableRows('note'),
+      'habits': await _syncTableRows('habit'),
+      'habit_logs': await _syncTableRows('habit_log'),
+      'notes': await _syncTableRows('note'),
     };
   }
 
@@ -844,33 +838,64 @@ CREATE TABLE IF NOT EXISTS attachment (
     return idMap[remotePid] ?? remotePid;
   }
 
+  int _rowUpdatedAt(Map<String, Object?> row) {
+    final v = row['updated_at'];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return 0;
+  }
+
+  /// Insert new ids; replace existing rows when the peer copy is newer.
   Future<int> _mergeTableById({
     required String table,
     required List? raw,
     required Set<String> existingIds,
     void Function(Map<String, Object?> row)? touch,
   }) async {
-    var added = 0;
+    var changed = 0;
     for (final item in raw ?? const []) {
       final row = Map<String, Object?>.from(item as Map);
       final id = row['id'] as String?;
-      if (id == null || existingIds.contains(id)) continue;
+      if (id == null) continue;
       touch?.call(row);
-      await userDb.insert(table, row);
-      existingIds.add(id);
-      added++;
+      if (!existingIds.contains(id)) {
+        await userDb.insert(table, row);
+        existingIds.add(id);
+        changed++;
+        continue;
+      }
+      final local = await userDb.query(
+        table,
+        columns: ['updated_at', 'deleted'],
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (local.isEmpty) {
+        await userDb.insert(table, row);
+        changed++;
+        continue;
+      }
+      final localAt = _rowUpdatedAt(local.first);
+      final remoteAt = _rowUpdatedAt(row);
+      if (remoteAt < localAt) continue;
+      if (remoteAt == localAt &&
+          (local.first['deleted'] as int? ?? 0) ==
+              (row['deleted'] as int? ?? 0)) {
+        continue;
+      }
+      await userDb.update(table, row, where: 'id = ?', whereArgs: [id]);
+      changed++;
     }
-    return added;
+    return changed;
   }
 
-  /// Merge a peer vault without wiping. Skips rows that already exist by id.
-  Future<({
-    int profilesAdded,
-    int reportsAdded,
-    int careRowsAdded,
-  })> mergeFromExportJson(
-    String jsonStr,
-  ) async {
+  bool _isDbReportRow(Map<String, dynamic> m) =>
+      m['collected_at'] is int || m['collected_at'] is num;
+
+  /// Merge a peer vault without wiping. Newer updated_at wins; soft-deletes sync.
+  Future<({int profilesAdded, int reportsAdded, int careRowsAdded})>
+  mergeFromExportJson(String jsonStr) async {
     final map = jsonDecode(jsonStr) as Map<String, dynamic>;
     if (map['format'] != 'bodyline-export-v1') {
       throw StateError('Not a Vitalog export');
@@ -884,6 +909,7 @@ CREATE TABLE IF NOT EXISTS attachment (
       final remoteId = m['id'] as String?;
       final name = (m['name'] as String?)?.trim() ?? 'Shared';
       if (remoteId == null) continue;
+      final remoteDeleted = (m['deleted'] as num?)?.toInt() ?? 0;
       ProfileRecord? local;
       for (final p in profiles) {
         if (p.id == remoteId || p.name.toLowerCase() == name.toLowerCase()) {
@@ -891,55 +917,133 @@ CREATE TABLE IF NOT EXISTS attachment (
           break;
         }
       }
+      if (remoteDeleted == 1) {
+        if (local != null && profiles.length > 1) {
+          try {
+            await softDeleteProfile(local.id);
+          } catch (_) {}
+        }
+        if (local != null) idMap[remoteId] = local.id;
+        continue;
+      }
+      final blood = m['blood_group'] as String?;
+      final height = (m['height_cm'] as num?)?.toDouble();
       if (local == null) {
         local = await createProfile(
           name: name,
           relation: m['relation'] as String? ?? 'other',
           sex: m['sex'] as String?,
           dob: m['dob'] as String?,
+          bloodGroup: blood,
+          heightCm: height,
+          id: remoteId,
         );
         profilesAdded++;
+      } else {
+        final needsBlood =
+            blood != null && blood.isNotEmpty && local.bloodGroup != blood;
+        final needsHeight = height != null && local.heightCm != height;
+        final needsSex = m['sex'] != null && local.sex != m['sex'];
+        final needsDob = m['dob'] != null && local.dob != m['dob'];
+        final needsName = local.name != name;
+        final needsRelation =
+            m['relation'] != null && local.relation != m['relation'];
+        if (needsBlood ||
+            needsHeight ||
+            needsSex ||
+            needsDob ||
+            needsName ||
+            needsRelation) {
+          local = await updateProfile(
+            id: local.id,
+            name: name,
+            relation: m['relation'] as String?,
+            sex: m['sex'] as String?,
+            dob: m['dob'] as String?,
+            bloodGroup: blood,
+            heightCm: height,
+          );
+        }
       }
       idMap[remoteId] = local.id;
     }
 
-    final existingReportIds = {for (final r in this.reports) r.id};
     final remoteObservations = (map['observations'] as List?) ?? [];
     final remoteReports = (map['reports'] as List?) ?? [];
-    for (final raw in remoteReports) {
-      final m = Map<String, dynamic>.from(raw as Map);
-      final rid = m['id'] as String?;
-      if (rid == null || existingReportIds.contains(rid)) continue;
-      final remotePid = m['profile_id'] as String? ?? '';
-      final localPid = idMap[remotePid] ?? activeProfileId;
-      if (localPid == null) continue;
-      final reportObs = [
-        for (final o in remoteObservations)
-          if ((o as Map)['report_id'] == rid)
-            ManualObservationInput(
-              parameterCode: o['parameter_code'] as String,
-              parameterName:
-                  o['parameter_name'] as String? ?? o['parameter_code'] as String,
-              valueReported: o['value_reported'] as String? ?? '',
-              unitReported: o['unit_reported'] as String? ?? '',
-              refLow: (o['ref_low'] as num?)?.toDouble(),
-              refHigh: (o['ref_high'] as num?)?.toDouble(),
-              refBands: decodeRefBandsJson(o['ref_bands_json'] as String?),
-            ),
-      ];
-      if (reportObs.isEmpty) continue;
-      await addManualPanel(
-        profileId: localPid,
-        title: m['title'] as String? ?? 'Synced report',
-        collectedAt:
-            DateTime.tryParse(m['collected_at'] as String? ?? '') ??
-                DateTime.now(),
-        values: reportObs,
-        reportId: rid,
-        source: 'sync',
+    final dbStyleReports =
+        remoteReports.isNotEmpty &&
+        _isDbReportRow(Map<String, dynamic>.from(remoteReports.first as Map));
+
+    if (dbStyleReports) {
+      final reportIds = {
+        for (final r in await userDb.query('report', columns: ['id']))
+          r['id']! as String,
+      };
+      reportsAdded += await _mergeTableById(
+        table: 'report',
+        raw: remoteReports,
+        existingIds: reportIds,
+        touch: (row) {
+          row['profile_id'] =
+              _mapProfileId(idMap, row['profile_id'] as String?) ??
+              row['profile_id'];
+        },
       );
-      existingReportIds.add(rid);
-      reportsAdded++;
+      final obsIds = {
+        for (final r in await userDb.query('observation', columns: ['id']))
+          r['id']! as String,
+      };
+      await _mergeTableById(
+        table: 'observation',
+        raw: remoteObservations,
+        existingIds: obsIds,
+        touch: (row) {
+          row['profile_id'] =
+              _mapProfileId(idMap, row['profile_id'] as String?) ??
+              row['profile_id'];
+        },
+      );
+    } else {
+      // Legacy slim export (pre full-row vault).
+      final existingReportIds = {for (final r in this.reports) r.id};
+      for (final raw in remoteReports) {
+        final m = Map<String, dynamic>.from(raw as Map);
+        final rid = m['id'] as String?;
+        if (rid == null || existingReportIds.contains(rid)) continue;
+        final remotePid = m['profile_id'] as String? ?? '';
+        final localPid = idMap[remotePid] ?? activeProfileId;
+        if (localPid == null) continue;
+        final reportObs = [
+          for (final o in remoteObservations)
+            if ((o as Map)['report_id'] == rid)
+              ManualObservationInput(
+                parameterCode: o['parameter_code'] as String,
+                parameterName:
+                    o['parameter_name'] as String? ??
+                    o['parameter_code'] as String,
+                valueReported: o['value_reported'] as String? ?? '',
+                unitReported: o['unit_reported'] as String? ?? '',
+                refLow: (o['ref_low'] as num?)?.toDouble(),
+                refHigh: (o['ref_high'] as num?)?.toDouble(),
+                refBands: decodeRefBandsJson(o['ref_bands_json'] as String?),
+                externalId: o['external_id'] as String?,
+                source: o['source'] as String? ?? 'sync',
+              ),
+        ];
+        if (reportObs.isEmpty) continue;
+        await addManualPanel(
+          profileId: localPid,
+          title: m['title'] as String? ?? 'Synced report',
+          collectedAt:
+              DateTime.tryParse(m['collected_at'] as String? ?? '') ??
+              DateTime.now(),
+          values: reportObs,
+          reportId: rid,
+          source: 'sync',
+        );
+        existingReportIds.add(rid);
+        reportsAdded++;
+      }
     }
 
     var careRowsAdded = 0;
@@ -953,7 +1057,8 @@ CREATE TABLE IF NOT EXISTS attachment (
       existingIds: providerIds,
       touch: (row) {
         row['profile_id'] =
-            _mapProfileId(idMap, row['profile_id'] as String?) ?? row['profile_id'];
+            _mapProfileId(idMap, row['profile_id'] as String?) ??
+            row['profile_id'];
       },
     );
 
@@ -967,7 +1072,8 @@ CREATE TABLE IF NOT EXISTS attachment (
       existingIds: visitIds,
       touch: (row) {
         row['profile_id'] =
-            _mapProfileId(idMap, row['profile_id'] as String?) ?? row['profile_id'];
+            _mapProfileId(idMap, row['profile_id'] as String?) ??
+            row['profile_id'];
       },
     );
 
@@ -981,12 +1087,16 @@ CREATE TABLE IF NOT EXISTS attachment (
       existingIds: medicationIds,
       touch: (row) {
         row['profile_id'] =
-            _mapProfileId(idMap, row['profile_id'] as String?) ?? row['profile_id'];
+            _mapProfileId(idMap, row['profile_id'] as String?) ??
+            row['profile_id'];
       },
     );
 
     final scheduleIds = {
-      for (final r in await userDb.query('medication_schedule', columns: ['id']))
+      for (final r in await userDb.query(
+        'medication_schedule',
+        columns: ['id'],
+      ))
         r['id']! as String,
     };
     careRowsAdded += await _mergeTableById(
@@ -1005,7 +1115,8 @@ CREATE TABLE IF NOT EXISTS attachment (
       existingIds: reminderIds,
       touch: (row) {
         row['profile_id'] =
-            _mapProfileId(idMap, row['profile_id'] as String?) ?? row['profile_id'];
+            _mapProfileId(idMap, row['profile_id'] as String?) ??
+            row['profile_id'];
       },
     );
 
@@ -1019,7 +1130,8 @@ CREATE TABLE IF NOT EXISTS attachment (
       existingIds: conditionIds,
       touch: (row) {
         row['profile_id'] =
-            _mapProfileId(idMap, row['profile_id'] as String?) ?? row['profile_id'];
+            _mapProfileId(idMap, row['profile_id'] as String?) ??
+            row['profile_id'];
       },
     );
 
@@ -1033,7 +1145,8 @@ CREATE TABLE IF NOT EXISTS attachment (
       existingIds: allergyIds,
       touch: (row) {
         row['profile_id'] =
-            _mapProfileId(idMap, row['profile_id'] as String?) ?? row['profile_id'];
+            _mapProfileId(idMap, row['profile_id'] as String?) ??
+            row['profile_id'];
       },
     );
 
@@ -1056,10 +1169,8 @@ CREATE TABLE IF NOT EXISTS attachment (
         existingIds: ids,
         touch: (row) {
           if (row.containsKey('profile_id')) {
-            row['profile_id'] = _mapProfileId(
-                  idMap,
-                  row['profile_id'] as String?,
-                ) ??
+            row['profile_id'] =
+                _mapProfileId(idMap, row['profile_id'] as String?) ??
                 row['profile_id'];
           }
         },
@@ -1067,9 +1178,7 @@ CREATE TABLE IF NOT EXISTS attachment (
     }
 
     final blobFiles = Map<String, String>.from(
-      (map['blob_files'] as Map?)?.map(
-            (k, v) => MapEntry('$k', '$v'),
-          ) ??
+      (map['blob_files'] as Map?)?.map((k, v) => MapEntry('$k', '$v')) ??
           const {},
     );
     for (final e in blobFiles.entries) {
@@ -1097,18 +1206,16 @@ CREATE TABLE IF NOT EXISTS attachment (
       final key = table == 'habit_log'
           ? 'habit_logs'
           : table == 'note'
-              ? 'notes'
-              : 'habits';
+          ? 'notes'
+          : 'habits';
       careRowsAdded += await _mergeTableById(
         table: table,
         raw: map[key] as List?,
         existingIds: ids,
         touch: table == 'habit_log' || table == 'habit' || table == 'note'
             ? (row) {
-                row['profile_id'] = _mapProfileId(
-                      idMap,
-                      row['profile_id'] as String?,
-                    ) ??
+                row['profile_id'] =
+                    _mapProfileId(idMap, row['profile_id'] as String?) ??
                     row['profile_id'];
               }
             : null,
@@ -1124,13 +1231,16 @@ CREATE TABLE IF NOT EXISTS attachment (
   }
 
   List<ObservationRecord> trendFor(String profileId, String parameterCode) {
-    final rows = observations
-        .where((o) =>
-            o.profileId == profileId &&
-            o.parameterCode == parameterCode &&
-            !o.deleted)
-        .toList()
-      ..sort((a, b) => a.observedAt.compareTo(b.observedAt));
+    final rows =
+        observations
+            .where(
+              (o) =>
+                  o.profileId == profileId &&
+                  o.parameterCode == parameterCode &&
+                  !o.deleted,
+            )
+            .toList()
+          ..sort((a, b) => a.observedAt.compareTo(b.observedAt));
     return rows;
   }
 
@@ -1179,13 +1289,9 @@ CREATE TABLE IF NOT EXISTS attachment (
   ) {
     return buildRefBandSetSuggestions([
       for (final o in _familyParamHistory(profileId, parameterCode))
-        RefBandSetHistoryRow(
-          refBands: o.refBands,
-          unit: o.unitReported,
-        ),
+        RefBandSetHistoryRow(refBands: o.refBands, unit: o.unitReported),
     ]);
   }
-
 
   Future<void> switchProfile(String id) async {
     if (profiles.any((p) => p.id == id)) {
@@ -1197,10 +1303,12 @@ CREATE TABLE IF NOT EXISTS attachment (
 
   int flaggedCountForReport(String reportId) {
     return observations
-        .where((o) =>
-            o.reportId == reportId &&
-            o.flag != null &&
-            o.flag != ObservationFlag.normal)
+        .where(
+          (o) =>
+              o.reportId == reportId &&
+              o.flag != null &&
+              o.flag != ObservationFlag.normal,
+        )
         .length;
   }
 
@@ -1235,6 +1343,7 @@ CREATE TABLE IF NOT EXISTS attachment (
         if (v == null || v.trim().isEmpty) return null;
         return v.trim();
       }
+
       return {
         'what_it_measures': s('what_it_measures'),
         'why_its_tested': s('why_its_tested'),
@@ -1298,6 +1407,7 @@ CREATE TABLE IF NOT EXISTS attachment (
         if (v == null || v.trim().isEmpty) return null;
         return v.trim();
       }
+
       return {
         'name': s('name'),
         'what_it_does': s('what_it_does'),
@@ -1312,7 +1422,9 @@ CREATE TABLE IF NOT EXISTS attachment (
   }
 
   /// Catalogue body_system.covers + name for relevance tokens.
-  Future<({String? name, String? covers})> bodySystemMeta(String systemCode) async {
+  Future<({String? name, String? covers})> bodySystemMeta(
+    String systemCode,
+  ) async {
     if (_catalog == null) return (name: null, covers: null);
     final rows = await _catalog!.query(
       'body_system',
@@ -1348,7 +1460,6 @@ CREATE TABLE IF NOT EXISTS attachment (
       return const [];
     }
   }
-
 
   /// Catalogue v2.1+: systems ordered by name (no sort_order column).
   Future<List<Map<String, Object?>>> _catalogBodySystems() async {
@@ -1448,12 +1559,14 @@ CREATE TABLE IF NOT EXISTS attachment (
       // if we only saw normals
       final nonNull = flags.whereType<ObservationFlag>().toList();
       if (nonNull.isEmpty) return null;
-      if (nonNull.any((f) =>
-          f == ObservationFlag.high ||
-          f == ObservationFlag.low ||
-          f == ObservationFlag.criticalHigh ||
-          f == ObservationFlag.criticalLow ||
-          f == ObservationFlag.abnormal)) {
+      if (nonNull.any(
+        (f) =>
+            f == ObservationFlag.high ||
+            f == ObservationFlag.low ||
+            f == ObservationFlag.criticalHigh ||
+            f == ObservationFlag.criticalLow ||
+            f == ObservationFlag.abnormal,
+      )) {
         return nonNull.firstWhere(
           (f) => f != ObservationFlag.normal,
           orElse: () => ObservationFlag.abnormal,
@@ -1491,7 +1604,7 @@ CREATE TABLE IF NOT EXISTS attachment (
     final rows = await _catalogBodySystems();
     return [
       for (final r in rows)
-        (code: r['code']! as String, name: r['name']! as String)
+        (code: r['code']! as String, name: r['name']! as String),
     ];
   }
 
@@ -1523,7 +1636,6 @@ CREATE TABLE IF NOT EXISTS attachment (
     }
   }
 
-
   /// Systems with display name + rollup flag + high/low counts for the active profile.
   Future<List<OrganSummary>> organSummaries() async {
     final profileId = activeProfileId;
@@ -1531,7 +1643,13 @@ CREATE TABLE IF NOT EXISTS attachment (
     if (profileId == null) {
       return [
         for (final s in systems)
-          OrganSummary(code: s.code, name: s.name, flag: null, highCount: 0, lowCount: 0),
+          OrganSummary(
+            code: s.code,
+            name: s.name,
+            flag: null,
+            highCount: 0,
+            lowCount: 0,
+          ),
       ];
     }
 
@@ -1548,14 +1666,17 @@ CREATE TABLE IF NOT EXISTS attachment (
 
     ObservationFlag? rollup(List<ObservationFlag> flags) {
       if (flags.isEmpty) return null;
-      if (flags.any((f) =>
-          f == ObservationFlag.high ||
-          f == ObservationFlag.criticalHigh ||
-          f == ObservationFlag.abnormal)) {
+      if (flags.any(
+        (f) =>
+            f == ObservationFlag.high ||
+            f == ObservationFlag.criticalHigh ||
+            f == ObservationFlag.abnormal,
+      )) {
         return ObservationFlag.high;
       }
-      if (flags.any((f) =>
-          f == ObservationFlag.low || f == ObservationFlag.criticalLow)) {
+      if (flags.any(
+        (f) => f == ObservationFlag.low || f == ObservationFlag.criticalLow,
+      )) {
         return ObservationFlag.low;
       }
       return ObservationFlag.normal;
@@ -1600,9 +1721,7 @@ CREATE TABLE IF NOT EXISTS attachment (
 
   Future<void> _ensureProfileHeightColumn() async {
     final cols = await userDb.rawQuery('PRAGMA table_info(profile)');
-    final names = <String>{
-      for (final c in cols) c['name']! as String,
-    };
+    final names = <String>{for (final c in cols) c['name']! as String};
     if (!names.contains('height_cm')) {
       await userDb.execute('ALTER TABLE profile ADD COLUMN height_cm REAL');
     }
@@ -1791,18 +1910,20 @@ CREATE TABLE local_device (
     }
 
     for (final o in observations) {
-      buf.writeln([
-        esc(o.profileId),
-        esc(o.reportId),
-        esc(o.parameterCode),
-        esc(o.parameterName),
-        esc(o.observedAt.toIso8601String()),
-        esc(o.valueReported),
-        esc(o.unitReported),
-        o.refLow?.toString() ?? '',
-        o.refHigh?.toString() ?? '',
-        esc(flagToDb(o.flag)),
-      ].join(','));
+      buf.writeln(
+        [
+          esc(o.profileId),
+          esc(o.reportId),
+          esc(o.parameterCode),
+          esc(o.parameterName),
+          esc(o.observedAt.toIso8601String()),
+          esc(o.valueReported),
+          esc(o.unitReported),
+          o.refLow?.toString() ?? '',
+          o.refHigh?.toString() ?? '',
+          esc(flagToDb(o.flag)),
+        ].join(','),
+      );
     }
     final dir = await getTemporaryDirectory();
     final file = File(
@@ -1814,7 +1935,6 @@ CREATE TABLE local_device (
     await file.writeAsString(buf.toString(), flush: true);
     return file;
   }
-
 
   /// Catalogue default Low/High for a parameter (adult). Prefer sex-specific, else `any`.
   Future<({double? low, double? high})?> defaultRefRange(
@@ -1846,11 +1966,12 @@ CREATE TABLE local_device (
     );
   }
 
-    
   /// Assign parameter codes to catalogue panels (largest overlap first).
   /// Leftovers land in panel code `other` / name "Other tests".
-  Future<List<({String panelCode, String panelName, List<String> parameterCodes})>>
-      groupParameterCodesByPanel(Iterable<String> parameterCodes) async {
+  Future<
+    List<({String panelCode, String panelName, List<String> parameterCodes})>
+  >
+  groupParameterCodesByPanel(Iterable<String> parameterCodes) async {
     final codes = {
       for (final c in parameterCodes)
         if (c.trim().isNotEmpty) c.trim(),
@@ -1897,8 +2018,10 @@ CREATE TABLE local_device (
       ));
     }
 
-    final leftovers = [for (final c in codes) if (!assigned.contains(c)) c]
-      ..sort();
+    final leftovers = [
+      for (final c in codes)
+        if (!assigned.contains(c)) c,
+    ]..sort();
     if (leftovers.isNotEmpty) {
       out.add((
         panelCode: 'other',
@@ -1971,7 +2094,10 @@ CREATE TABLE local_device (
     );
   }
 
-  Future<List<ParamDef>> searchCatalogParameters(String query, {int limit = 40}) async {
+  Future<List<ParamDef>> searchCatalogParameters(
+    String query, {
+    int limit = 40,
+  }) async {
     final q = query.trim().toLowerCase();
     if (q.isEmpty) return const [];
     final rows = await _catalog!.query('parameter');
@@ -1984,12 +2110,7 @@ CREATE TABLE local_device (
       final hay = '$code $name $short'.toLowerCase();
       if (!hay.contains(q)) continue;
       out.add(
-        ParamDef(
-          code,
-          name,
-          unit,
-          shortName: short.isNotEmpty ? short : null,
-        ),
+        ParamDef(code, name, unit, shortName: short.isNotEmpty ? short : null),
       );
       if (out.length >= limit) break;
     }
@@ -2036,10 +2157,7 @@ CREATE TABLE local_device (
       final normLabel = _norm(label);
       if (normLabel.isEmpty || _noiseLabels.contains(normLabel)) return null;
 
-      final keys = <String>{
-        normLabel,
-        ..._aliasKeysFromLabel(label),
-      };
+      final keys = <String>{normLabel, ..._aliasKeysFromLabel(label)};
       final hits = <MapEntry<String, String>>[];
       for (final k in keys) {
         if (k.length < 2) continue;
@@ -2139,11 +2257,13 @@ CREATE TABLE local_device (
           final replace = shouldReplaceLabHit(
             existingScore: existing,
             candidateScore: score,
-            candidateHasUnitOrRange: unit.isNotEmpty ||
+            candidateHasUnitOrRange:
+                unit.isNotEmpty ||
                 low != null ||
                 high != null ||
                 (bands != null && bands.isNotEmpty),
-            existingHasUnitOrRange: prevLine.unitReported.isNotEmpty ||
+            existingHasUnitOrRange:
+                prevLine.unitReported.isNotEmpty ||
                 prevLine.refLow != null ||
                 prevLine.refHigh != null ||
                 (prevLine.refBands != null && prevLine.refBands!.isNotEmpty),
@@ -2201,7 +2321,8 @@ CREATE TABLE local_device (
       if (_looksLikeRangeOnly(trimmed)) continue;
       final mRu = matchSameLineRangeUnitLabRow(trimmed);
       if (mRu != null) {
-        if (isEducationalProse(mRu.label) || isEducationalProse(trimmed)) continue;
+        if (isEducationalProse(mRu.label) || isEducationalProse(trimmed))
+          continue;
         final code = resolveCode(mRu.label, unit: mRu.unit);
         if (code == null) continue;
         addHit(
@@ -2284,7 +2405,11 @@ CREATE TABLE local_device (
       double? high;
       var valueAt = -1;
 
-      for (var k = 1; k <= kStackedValueLookahead && i + k < lines.length; k++) {
+      for (
+        var k = 1;
+        k <= kStackedValueLookahead && i + k < lines.length;
+        k++
+      ) {
         final peek = lines[i + k];
         if (pageMarker.hasMatch(peek)) break;
         if (isEducationalProse(peek)) break;
@@ -2427,22 +2552,64 @@ CREATE TABLE local_device (
     }
 
     // Dedup already applied in addHit via scores; sort for stable UI.
-    return out
-      ..sort((a, b) {
-        final c = a.pageIndex.compareTo(b.pageIndex);
-        if (c != 0) return c;
-        return a.parameterName.compareTo(b.parameterName);
-      });
+    return out..sort((a, b) {
+      final c = a.pageIndex.compareTo(b.pageIndex);
+      if (c != 0) return c;
+      return a.parameterName.compareTo(b.parameterName);
+    });
   }
 
   static const _noiseLabels = {
-    'test', 'tests', 'result', 'results', 'unit', 'units', 'range', 'ref',
-    'reference', 'method', 'page', 'patient', 'doctor', 'sample', 'collected',
-    'reported', 'investigation', 'parameter', 'observed', 'biological',
-    'download', 'report', 'lab', 'laboratory', 'specimen', 'technology',
-    'interpretation', 'note', 'notes', 'end', 'of', 'the', 'and', 'for',
-    'name', 'age', 'sex', 'male', 'female', 'mr', 'mrs', 'ms', 'dr',
-    'value', 'values', 'normal', 'low', 'high', 'status', 'print',
+    'test',
+    'tests',
+    'result',
+    'results',
+    'unit',
+    'units',
+    'range',
+    'ref',
+    'reference',
+    'method',
+    'page',
+    'patient',
+    'doctor',
+    'sample',
+    'collected',
+    'reported',
+    'investigation',
+    'parameter',
+    'observed',
+    'biological',
+    'download',
+    'report',
+    'lab',
+    'laboratory',
+    'specimen',
+    'technology',
+    'interpretation',
+    'note',
+    'notes',
+    'end',
+    'of',
+    'the',
+    'and',
+    'for',
+    'name',
+    'age',
+    'sex',
+    'male',
+    'female',
+    'mr',
+    'mrs',
+    'ms',
+    'dr',
+    'value',
+    'values',
+    'normal',
+    'low',
+    'high',
+    'status',
+    'print',
   };
 
   /// Catalogue uses British spelling; lab PDFs often use American.
@@ -2471,9 +2638,9 @@ CREATE TABLE local_device (
   }
 
   bool _looksLikeRangeOnly(String s) => RegExp(
-        r'^\d+(?:\.\d+)?\s*[-–to]+\s*\d+(?:\.\d+)?\s*$',
-        caseSensitive: false,
-      ).hasMatch(s.trim());
+    r'^\d+(?:\.\d+)?\s*[-–to]+\s*\d+(?:\.\d+)?\s*$',
+    caseSensitive: false,
+  ).hasMatch(s.trim());
 
   String? _pickByUnit(
     List<String> codes,
@@ -2525,7 +2692,10 @@ CREATE TABLE local_device (
     if (usable.length < 4) {
       final raw = (textFallback ?? '').trim();
       if (raw.isEmpty) return const [];
-      return parseLabText(normalizeOcrLabText(raw), bandsSource: bandsSource ?? raw);
+      return parseLabText(
+        normalizeOcrLabText(raw),
+        bandsSource: bandsSource ?? raw,
+      );
     }
 
     final catalog = await _matchCatalog();
@@ -2569,7 +2739,9 @@ CREATE TABLE local_device (
         normalizeOcrLabText(layoutText),
         bandsSource: bandsSource ?? textFallback ?? layoutText,
       );
-      final seen = {for (final p in fromPipeline) '${p.pageIndex}::${p.parameterCode}'};
+      final seen = {
+        for (final p in fromPipeline) '${p.pageIndex}::${p.parameterCode}',
+      };
       for (final l in legacy) {
         final key = '${l.pageIndex}::${l.parameterCode}';
         if (seen.contains(key)) continue;
@@ -2682,7 +2854,9 @@ CREATE TABLE local_device (
           if ((o as Map)['report_id'] == m['id'])
             ManualObservationInput(
               parameterCode: o['parameter_code'] as String,
-              parameterName: o['parameter_name'] as String? ?? o['parameter_code'] as String,
+              parameterName:
+                  o['parameter_name'] as String? ??
+                  o['parameter_code'] as String,
               valueReported: o['value_reported'] as String,
               unitReported: o['unit_reported'] as String? ?? '',
               refLow: (o['ref_low'] as num?)?.toDouble(),
@@ -2694,7 +2868,8 @@ CREATE TABLE local_device (
       await addManualPanel(
         profileId: newPid,
         title: m['title'] as String? ?? 'Restored report',
-        collectedAt: DateTime.tryParse(m['collected_at'] as String? ?? '') ??
+        collectedAt:
+            DateTime.tryParse(m['collected_at'] as String? ?? '') ??
             DateTime.now(),
         values: reportObs,
       );

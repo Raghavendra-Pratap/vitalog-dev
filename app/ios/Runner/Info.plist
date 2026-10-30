@@ -83,6 +83,8 @@
 	<string>Vitalog uses the camera to scan host QR codes for device pairing and to capture lab report photos. Images stay on this device.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Vitalog reads photos you select so it can recognize lab report text on this device. Images stay on this device.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Vitalog uses local network details while pairing devices on your Wi‑Fi so family sync can find this phone. It does not track where you go, and location is not sent to Vitalog servers.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Vitalog can read weight, glucose, blood pressure, steps, and sleep duration you already keep in Apple Health so they appear in your on-device log. Nothing is sent to Vitalog servers.</string>
 	<key>NSHealthUpdateUsageDescription</key>

@@ -68,6 +68,7 @@ class CareScreenState extends State<CareScreen> {
     }
     final ensured = await widget.store.ensureVisitFollowUpReminders(pid);
     for (final rem in ensured) {
+      await ReminderNotifications.instance.ensurePermission();
       await ReminderNotifications.instance.scheduleReminder(rem);
     }
     final v = await widget.store.listVisits(pid);
@@ -113,10 +114,6 @@ class CareScreenState extends State<CareScreen> {
             : (showRem ? 'page-visits-reminders-fab' : 'page-visits-fab'),
         onPressed: showRem ? _addMenu : _addVisit,
         tooltip: showRem ? 'Add' : 'Add visit',
-        backgroundColor: BodylineColors.teal,
-        foregroundColor: BodylineColors.isDark
-            ? const Color(0xFF04201C)
-            : Colors.white,
         child: const Icon(Icons.add),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -138,7 +135,7 @@ class CareScreenState extends State<CareScreen> {
                     for (final r in _reminders)
                       _card(
                         title: displayReportTitle(r.title),
-                        subtitle: 'Due ${fmt.format(r.dueAt)}',
+                        subtitle: 'Due ${DateFormat('d MMM yyyy · h:mm a').format(r.dueAt)}',
                         trailing: TextButton(
                           onPressed: () async {
                             final next = await widget.store.completeReminder(r.id);

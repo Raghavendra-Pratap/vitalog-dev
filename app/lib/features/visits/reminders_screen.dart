@@ -7,6 +7,7 @@ import '../../desktop.dart';
 import '../../notifications/reminder_notifications.dart';
 import '../../theme/desktop_layout.dart';
 import '../../theme/tokens.dart';
+import '../medicines/dose_wait_header_chip.dart';
 import '../medicines/dose_wait_controller.dart';
 import '../medicines/dose_wait_screen.dart';
 import '../medicines/todays_doses_panel.dart';
@@ -108,7 +109,51 @@ class RemindersScreenState extends State<RemindersScreen> {
   }
 
   Future<void> _enableAlerts() async {
-    await ReminderNotifications.instance.ensurePermission();
+    final granted = await ReminderNotifications.instance.ensurePermission();
+    final alerts = await ReminderNotifications.instance.notificationsEnabled();
+    if (!mounted) return;
+    setState(() => _alertsOn = alerts);
+    if (!granted && !alerts) {
+      await ReminderNotifications.instance.openSystemNotificationSettings();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Turn on notifications for Vitalog in System Settings, then tap Enable again.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _testAlert() async {
+    final ok = await ReminderNotifications.instance.scheduleTestIn(seconds: 15);
+    if (!mounted) return;
+    final pending = await ReminderNotifications.instance.pendingCount();
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    if (ok) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Test alert in ~15s · $pending pending on this device'),
+        ),
+      );
+    } else {
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Notifications are off for Vitalog. Enable them in System Settings.',
+          ),
+          action: SnackBarAction(
+            label: 'Settings',
+            onPressed: () {
+              ReminderNotifications.instance.openSystemNotificationSettings();
+            },
+          ),
+        ),
+      );
+      await ReminderNotifications.instance.openSystemNotificationSettings();
+    }
     final alerts = await ReminderNotifications.instance.notificationsEnabled();
     if (!mounted) return;
     setState(() => _alertsOn = alerts);
@@ -164,6 +209,7 @@ class RemindersScreenState extends State<RemindersScreen> {
                   _alertsBanner(context),
                   const SizedBox(height: 12),
                 ],
+                _testAlertChip(context),
                 TodaysDosesPanel(
                   store: widget.store,
                   onChanged: widget.onChanged,
@@ -218,15 +264,16 @@ class RemindersScreenState extends State<RemindersScreen> {
   Widget _buildMobile(BuildContext context) {
     return Scaffold(
       backgroundColor: BodylineColors.paper,
-      appBar: widget.embedded ? null : AppBar(title: const Text('Reminders')),
+      appBar: widget.embedded
+          ? null
+          : AppBar(
+              title: const Text('Reminders'),
+              actions: doseWaitActions(),
+            ),
       floatingActionButton: FloatingActionButton(
         heroTag: widget.embedded ? 'care-tab-reminders-fab' : 'page-reminders-fab',
         onPressed: _add,
         tooltip: 'Add reminder',
-        backgroundColor: BodylineColors.teal,
-        foregroundColor: BodylineColors.isDark
-            ? const Color(0xFF04201C)
-            : Colors.white,
         child: const Icon(Icons.add),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -241,6 +288,7 @@ class RemindersScreenState extends State<RemindersScreen> {
                   _alertsBanner(context),
                   const SizedBox(height: 12),
                 ],
+                _testAlertChip(context),
                 TodaysDosesPanel(
                   store: widget.store,
                   onChanged: widget.onChanged,
@@ -414,8 +462,19 @@ class RemindersScreenState extends State<RemindersScreen> {
     );
   }
 
+  Widget _testAlertChip(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: _testAlert,
+        icon: const Icon(Icons.notification_add_outlined, size: 18),
+        label: const Text('Test alert in 15s'),
+      ),
+    );
+  }
+
   List<Widget> _reminderTiles(BuildContext context) {
-    final fmt = DateFormat('d MMM yyyy');
+    final fmt = DateFormat('d MMM yyyy · h:mm a');
     return [
       for (final r in _reminders) ...[
         _reminderCard(context, r, fmt),
@@ -530,7 +589,7 @@ class RemindersScreenState extends State<RemindersScreen> {
         ),
       );
     }
-    final fmt = DateFormat('d MMM yyyy');
+    final fmt = DateFormat('d MMM yyyy · h:mm a');
     final recur = ReminderRecord.labelForRrule(r.rrule);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -560,8 +619,6 @@ class RemindersScreenState extends State<RemindersScreen> {
         FilledButton(
           onPressed: () => _complete(r),
           style: FilledButton.styleFrom(
-            backgroundColor: BodylineColors.ink,
-            foregroundColor: BodylineColors.onInk,
             minimumSize: const Size.fromHeight(48),
           ),
           child: Text(r.isRecurring ? 'Done this time' : 'Done'),

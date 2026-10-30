@@ -297,12 +297,17 @@ ThemeData bodylineTheme(Brightness brightness) {
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith((s) {
-        if (s.contains(WidgetState.selected)) return teal;
-        return inkSubtle;
+        // White thumb so the knob reads clearly on teal (Android Material 3).
+        if (s.contains(WidgetState.selected)) return Colors.white;
+        return Colors.white;
       }),
       trackColor: WidgetStateProperty.resolveWith((s) {
-        if (s.contains(WidgetState.selected)) return teal.withValues(alpha: 0.45);
+        if (s.contains(WidgetState.selected)) return teal;
         return border;
+      }),
+      trackOutlineColor: WidgetStateProperty.resolveWith((s) {
+        if (s.contains(WidgetState.selected)) return Colors.transparent;
+        return inkSubtle.withValues(alpha: 0.55);
       }),
     ),
     navigationBarTheme: NavigationBarThemeData(
@@ -328,6 +333,13 @@ ThemeData bodylineTheme(Brightness brightness) {
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: ink,
       foregroundColor: onInk,
+      elevation: 3,
+      focusElevation: 4,
+      hoverElevation: 4,
+      highlightElevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: surface,

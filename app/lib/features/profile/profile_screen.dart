@@ -12,6 +12,7 @@ import '../../widgets/clinical_attachments.dart';
 import '../../data/models.dart';
 import '../../theme/desktop_layout.dart';
 import '../../theme/tokens.dart';
+import '../medicines/dose_wait_header_chip.dart';
 import '../../widgets/bodyline_dialog.dart';
 import '../settings/settings_screen.dart';
 import '../profiles/edit_profile_sheet.dart';
@@ -331,21 +332,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         children: [
           if (!widget.desktop)
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Health profile',
-                  style: Theme.of(context).textTheme.headlineMedium,
+            TabPageHeader(
+              title: 'Health profile',
+              trailing: [
+                IconButton(
+                  tooltip: 'Settings',
+                  onPressed: _openSettings,
+                  icon: const Icon(Icons.settings_outlined),
                 ),
-              ),
-              IconButton(
-                tooltip: 'Settings',
-                onPressed: _openSettings,
-                icon: const Icon(Icons.settings_outlined),
-              ),
-            ],
-          ),
+              ],
+            ),
           if (profile != null) ...[
             const SizedBox(height: 8),
             _mobileProfileCard(profile),
@@ -388,8 +384,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             heroTag: 'profile-health-add',
             tooltip: 'Add',
             onPressed: _openSectionPicker,
-            backgroundColor: BodylineColors.ink,
-            foregroundColor: BodylineColors.onInk,
             child: const Icon(Icons.add),
           ),
         ),
@@ -1632,10 +1626,6 @@ class _SectionListScreenState extends State<_SectionListScreen> {
         heroTag: 'profile-section-add-fab',
         onPressed: _add,
         tooltip: 'Add',
-        backgroundColor: BodylineColors.teal,
-        foregroundColor: BodylineColors.isDark
-            ? const Color(0xFF04201C)
-            : Colors.white,
         child: const Icon(Icons.add),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,

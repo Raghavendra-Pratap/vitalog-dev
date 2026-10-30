@@ -19,6 +19,16 @@ class BodyPanelPrefs {
 
   /// Systems that have a dedicated silhouette on the v2 body map.
   /// Source: assets/brand/vitalog-body-map-organs.html
+  /// Home "Your body" list — keep short so it fits beside the figure.
+  static const homeSpotlightCodes = [
+    'blood',
+    'heart',
+    'liver',
+    'kidney',
+    'thyroid',
+    'pancreas', // metabolic / blood sugar in catalogue
+  ];
+
   static const glyphCodes = {
     'general',
     'lungs',
@@ -37,10 +47,41 @@ class BodyPanelPrefs {
     'reproductive',
   };
 
+  /// Short home labels so the body card stays readable on a phone.
+  static const shortLabels = {
+    'general': 'General',
+    'lungs': 'Lungs',
+    'bones': 'Bones',
+    'blood': 'Blood',
+    'heart': 'Heart',
+    'liver': 'Liver',
+    'immune': 'Immune',
+    'pancreas': 'Metabolic',
+    'kidney': 'Kidneys',
+    'adrenal': 'Adrenal',
+    'thyroid': 'Thyroid',
+    'metabolic': 'Metabolic',
+    'parathyroid': 'Parathyroid',
+    'pituitary': 'Pituitary',
+    'prostate': 'Prostate',
+    'reproductive': 'Reproductive',
+  };
+
+  static String shortLabel(String code, [String? fallback]) {
+    final known = shortLabels[code];
+    if (known != null) return known;
+    final raw = (fallback ?? code).trim();
+    if (raw.isEmpty) return code;
+    final cut = raw.split(RegExp(r'[&/]')).first.trim();
+    return cut.isEmpty ? code : cut;
+  }
+
   static String _key(String profileId) => 'body_panel_prefs_$profileId';
 
-  List<String> get visibleOrder =>
-      [for (final c in order) if (!hidden.contains(c)) c];
+  List<String> get visibleOrder => [
+        for (final c in order)
+          if (!hidden.contains(c)) c
+      ];
 
   static BodyPanelPrefs defaultsFromCatalog(Iterable<String> catalogCodes) {
     final order = [
@@ -123,12 +164,20 @@ class BodyPanelPrefs {
     ];
   }
 
+  /// Catalogue codes that paint using a different silhouette key.
+  static const mapAliases = {
+    'metabolic': 'pancreas',
+  };
+
   Map<String, V> mapFlags<V>(Map<String, V> all) {
     final visible = visibleOrder.toSet();
-    return {
-      for (final e in all.entries)
-        if (visible.contains(e.key) && glyphCodes.contains(e.key))
-          e.key: e.value,
-    };
+    final out = <String, V>{};
+    for (final e in all.entries) {
+      if (!visible.contains(e.key)) continue;
+      final paintAs = mapAliases[e.key] ?? e.key;
+      if (!glyphCodes.contains(paintAs)) continue;
+      out[paintAs] = e.value;
+    }
+    return out;
   }
 }

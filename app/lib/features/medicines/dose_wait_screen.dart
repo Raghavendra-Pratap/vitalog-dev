@@ -42,6 +42,8 @@ class _DoseTimerViewState extends State<DoseTimerView> {
   int _hours = 0;
   int _minutes = 30;
   int _seconds = 0;
+  bool _running = false;
+  late final ValueNotifier<String> _readout;
   late final FixedExtentScrollController _hoursCtrl;
   late final FixedExtentScrollController _minutesCtrl;
   late final FixedExtentScrollController _secondsCtrl;
@@ -49,6 +51,14 @@ class _DoseTimerViewState extends State<DoseTimerView> {
   @override
   void initState() {
     super.initState();
+    final wait = DoseWaitController.instance;
+    _running = wait.countdownRunning;
+    _readout = ValueNotifier(
+      _running
+          ? DoseWaitController.formatDuration(
+              wait.countdownRemaining ?? Duration.zero)
+          : _fmtHms(_hours, _minutes, _seconds),
+    );
     _hoursCtrl = FixedExtentScrollController(initialItem: _hours);
     _minutesCtrl = FixedExtentScrollController(initialItem: _minutes);
     _secondsCtrl = FixedExtentScrollController(initialItem: _seconds);
@@ -58,6 +68,7 @@ class _DoseTimerViewState extends State<DoseTimerView> {
   @override
   void dispose() {
     DoseWaitController.instance.removeListener(_tick);
+    _readout.dispose();
     _hoursCtrl.dispose();
     _minutesCtrl.dispose();
     _secondsCtrl.dispose();
@@ -65,15 +76,30 @@ class _DoseTimerViewState extends State<DoseTimerView> {
   }
 
   void _tick() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final wait = DoseWaitController.instance;
+    final running = wait.countdownRunning;
+    if (running) {
+      _readout.value = DoseWaitController.formatDuration(
+        wait.countdownRemaining ?? Duration.zero,
+      );
+    }
+    if (running != _running) {
+      _running = running;
+      setState(() {});
+    }
+  }
+
+  void _paintDuration() {
+    if (_running) return;
+    _readout.value = _fmtHms(_hours, _minutes, _seconds);
   }
 
   void _applyPreset(int minutes) {
-    setState(() {
-      _hours = 0;
-      _minutes = minutes;
-      _seconds = 0;
-    });
+    _hours = 0;
+    _minutes = minutes;
+    _seconds = 0;
+    _paintDuration();
     _hoursCtrl.jumpToItem(0);
     _minutesCtrl.jumpToItem(minutes);
     _secondsCtrl.jumpToItem(0);
@@ -111,16 +137,16 @@ class _DoseTimerViewState extends State<DoseTimerView> {
           const SizedBox(height: 16),
         ],
         const Spacer(),
-        Text(
-          running
-              ? DoseWaitController.formatDuration(
-                  wait.countdownRemaining ?? Duration.zero)
-              : _fmtHms(_hours, _minutes, _seconds),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.w800,
-            fontFeatures: [FontFeature.tabularFigures()],
+        ValueListenableBuilder<String>(
+          valueListenable: _readout,
+          builder: (context, time, _) => Text(
+            time,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 48,
+              fontWeight: FontWeight.w800,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -136,28 +162,34 @@ class _DoseTimerViewState extends State<DoseTimerView> {
               Expanded(
                 child: _scrollWheel(
                   label: 'Hours',
-                  value: _hours,
                   max: 23,
                   controller: _hoursCtrl,
-                  onChanged: (v) => setState(() => _hours = v),
+                  onChanged: (v) {
+                    _hours = v;
+                    _paintDuration();
+                  },
                 ),
               ),
               Expanded(
                 child: _scrollWheel(
                   label: 'Minutes',
-                  value: _minutes,
                   max: 59,
                   controller: _minutesCtrl,
-                  onChanged: (v) => setState(() => _minutes = v),
+                  onChanged: (v) {
+                    _minutes = v;
+                    _paintDuration();
+                  },
                 ),
               ),
               Expanded(
                 child: _scrollWheel(
                   label: 'Seconds',
-                  value: _seconds,
                   max: 59,
                   controller: _secondsCtrl,
-                  onChanged: (v) => setState(() => _seconds = v),
+                  onChanged: (v) {
+                    _seconds = v;
+                    _paintDuration();
+                  },
                 ),
               ),
             ],
@@ -210,7 +242,6 @@ class _DoseTimerViewState extends State<DoseTimerView> {
 
   Widget _scrollWheel({
     required String label,
-    required int value,
     required int max,
     required FixedExtentScrollController controller,
     required ValueChanged<int> onChanged,
@@ -238,16 +269,13 @@ class _DoseTimerViewState extends State<DoseTimerView> {
             childDelegate: ListWheelChildBuilderDelegate(
               childCount: max + 1,
               builder: (context, index) {
-                final selected = index == value;
                 return Center(
                   child: Text(
                     index.toString().padLeft(2, '0'),
                     style: TextStyle(
-                      fontSize: selected ? 26 : 18,
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                      color: selected
-                          ? BodylineColors.ink
-                          : BodylineColors.inkSubtle,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: BodylineColors.ink,
                       fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
@@ -272,20 +300,46 @@ class DoseStopwatchView extends StatefulWidget {
 }
 
 class _DoseStopwatchViewState extends State<DoseStopwatchView> {
+  late bool _running;
+  late int _laps;
+  late final ValueNotifier<String> _readout;
+
   @override
   void initState() {
     super.initState();
+    final wait = DoseWaitController.instance;
+    _running = wait.stopwatchRunning;
+    _laps = wait.stopwatchLaps.length;
+    final elapsed = wait.stopwatchElapsed;
+    _readout = ValueNotifier(
+      elapsed != null
+          ? DoseWaitController.formatStopwatch(elapsed)
+          : '00:00.00',
+    );
     DoseWaitController.instance.addListener(_tick);
   }
 
   @override
   void dispose() {
     DoseWaitController.instance.removeListener(_tick);
+    _readout.dispose();
     super.dispose();
   }
 
   void _tick() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final wait = DoseWaitController.instance;
+    final running = wait.stopwatchRunning;
+    final laps = wait.stopwatchLaps.length;
+    final elapsed = wait.stopwatchElapsed;
+    _readout.value = elapsed != null
+        ? DoseWaitController.formatStopwatch(elapsed)
+        : '00:00.00';
+    if (running != _running || laps != _laps) {
+      _running = running;
+      _laps = laps;
+      setState(() {});
+    }
   }
 
   Future<void> _start() async {
@@ -301,22 +355,21 @@ class _DoseStopwatchViewState extends State<DoseStopwatchView> {
     final readout = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          wait.stopwatchElapsed != null
-              ? DoseWaitController.formatStopwatch(wait.stopwatchElapsed!)
-              : '00:00.00',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 48,
-            fontWeight: FontWeight.w800,
-            fontFeatures: [FontFeature.tabularFigures()],
+        ValueListenableBuilder<String>(
+          valueListenable: _readout,
+          builder: (context, time, _) => Text(
+            time,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 48,
+              fontWeight: FontWeight.w800,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          running
-              ? 'Running'
-              : (hasLaps ? 'Stopped' : 'Ready'),
+          running ? 'Running' : (hasLaps ? 'Stopped' : 'Ready'),
           textAlign: TextAlign.center,
           style: TextStyle(color: BodylineColors.inkSubtle),
         ),

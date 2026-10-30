@@ -17,6 +17,9 @@ const _recurPresets = <({String? rrule, String label})>[
   (rrule: 'FREQ=YEARLY', label: 'Yearly'),
 ];
 
+DateTime _withTime(DateTime day, TimeOfDay tod) =>
+    DateTime(day.year, day.month, day.day, tod.hour, tod.minute);
+
 /// Shared add-reminder dialog. Returns the saved row, or null if cancelled.
 Future<ReminderRecord?> showAddReminderDialog(
   BuildContext context, {
@@ -32,7 +35,12 @@ Future<ReminderRecord?> showAddReminderDialog(
 
   final title = TextEditingController(text: initialTitle ?? '');
   final notesCtrl = TextEditingController();
-  DateTime due = initialDue ?? DateTime.now().add(const Duration(days: 30));
+  // Default 09:00 so date-only pickers don't silently become midnight.
+  final seed = initialDue ?? DateTime.now().add(const Duration(days: 30));
+  DateTime due = (initialDue != null &&
+          (initialDue.hour != 0 || initialDue.minute != 0))
+      ? initialDue
+      : DateTime(seed.year, seed.month, seed.day, 9, 0);
   String? rrule = initialRrule;
 
   final ok = await showDialog<bool>(
@@ -46,7 +54,8 @@ Future<ReminderRecord?> showAddReminderDialog(
         insetPadding: bodylineDialogInset(ctx),
         content: SizedBox(
           width: bodylineDialogWidth(ctx, 400),
-          child: Column(
+          child: SingleChildScrollView(
+            child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -58,8 +67,8 @@ Future<ReminderRecord?> showAddReminderDialog(
               const SizedBox(height: 12),
               TextField(
                 controller: notesCtrl,
-                minLines: 2,
-                maxLines: 4,
+                minLines: 1,
+                maxLines: 3,
                 decoration: const InputDecoration(
                   labelText: 'Notes (optional)',
                   alignLabelWithHint: true,
@@ -77,7 +86,31 @@ Future<ReminderRecord?> showAddReminderDialog(
                     firstDate: DateTime.now(),
                     lastDate: DateTime.now().add(const Duration(days: 3650)),
                   );
-                  if (d != null) setLocal(() => due = d);
+                  if (d != null) {
+                    setLocal(
+                      () => due = _withTime(
+                        d,
+                        TimeOfDay(hour: due.hour, minute: due.minute),
+                      ),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  'Time: ${DateFormat('h:mm a').format(due)}',
+                ),
+                trailing: const Icon(Icons.schedule_outlined, size: 18),
+                onTap: () async {
+                  final t = await showTimePicker(
+                    context: ctx,
+                    initialTime: TimeOfDay(hour: due.hour, minute: due.minute),
+                    helpText: 'Alert time',
+                  );
+                  if (t != null) {
+                    setLocal(() => due = _withTime(due, t));
+                  }
                 },
               ),
               const SizedBox(height: 4),
@@ -102,6 +135,7 @@ Future<ReminderRecord?> showAddReminderDialog(
                 ],
               ),
             ],
+            ),
           ),
         ),
         actions: [
@@ -141,13 +175,14 @@ Future<ReminderRecord?> showAddReminderDialog(
 
   if (context.mounted) {
     final recur = ReminderRecord.labelForRrule(rrule);
+    final when = DateFormat('d MMM yyyy · h:mm a').format(due);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           allowed
               ? (recur == null
-                  ? 'Reminder saved. You will get an alert on ${DateFormat('d MMM yyyy').format(due)}.'
-                  : 'Reminder saved ($recur). Next alert ${DateFormat('d MMM yyyy').format(due)}.')
+                  ? 'Reminder saved. Alert at $when.'
+                  : 'Reminder saved ($recur). Next alert $when.')
               : 'Reminder saved on this device. Enable notifications in system settings to get alerts.',
         ),
       ),

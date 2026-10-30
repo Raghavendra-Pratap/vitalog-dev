@@ -1,7 +1,7 @@
 name: bodyline
 description: Local-first family lab tracker. Manual entry first.
 publish_to: "none"
-version: 0.2.6+95
+version: 0.2.8+99
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -52,6 +52,7 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  msix: ^3.16.24
 
 flutter:
   uses-material-design: true
@@ -70,3 +71,18 @@ flutter:
     - family: Manrope
       fonts:
         - asset: assets/fonts/Manrope-Variable.ttf
+
+# Microsoft Store package (fill publisher CN from Partner Center → Product identity).
+# Build on Windows: flutter pub get && flutter build windows --release && dart run msix:create --store
+msix_config:
+  display_name: Vitalog
+  publisher_display_name: Raghavendra Pratap
+  identity_name: RaghavendraPratap.Vitalog
+  publisher: CN=36A7C9C2-03FD-4700-A34E-3BF7A6216896
+  msix_version: 0.2.8.99
+  logo_path: windows/store/StoreLogo.png
+  capabilities: internetClient, privateNetworkClientServer, webcam
+  languages: en-us
+  store: true
+  os_min_version: 10.0.17763.0
+

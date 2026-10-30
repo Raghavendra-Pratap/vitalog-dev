@@ -6,6 +6,7 @@ import '../../data/local_store.dart';
 import '../../data/models.dart';
 import '../../theme/desktop_layout.dart';
 import '../../theme/tokens.dart';
+import '../medicines/dose_wait_header_chip.dart';
 import '../entry/manual_panel_screen.dart';
 import '../../widgets/sparkline.dart';
 import '../../widgets/trend_panel.dart';
@@ -502,16 +503,10 @@ class _TestsScreenState extends State<TestsScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Tests', style: Theme.of(context).textTheme.headlineMedium),
-                Text(
-                  '${latest.length} parameters tracked'
+            child: TabPageHeader(
+              title: 'Tests',
+              subtitle: '${latest.length} parameters tracked'
                   '${profile != null ? ' for ${profile.name}' : ''}',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
             ),
           ),
           Padding(

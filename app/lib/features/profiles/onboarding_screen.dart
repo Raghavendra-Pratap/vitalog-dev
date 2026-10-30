@@ -84,16 +84,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    // Scaffold already shrinks for the keyboard — do not add viewInsets again
+    // (that squashes the column and pushes the name field off-screen).
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(24, 16, 24, 24 + bottomInset),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -110,6 +113,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       TextField(
                         controller: _name,
                         textCapitalization: TextCapitalization.words,
+                        textInputAction: TextInputAction.done,
+                        scrollPadding: const EdgeInsets.only(bottom: 120),
                         decoration: const InputDecoration(
                           labelText: 'Your name',
                         ),
@@ -174,32 +179,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           ),
                         ),
                       ),
+                      const Spacer(),
                       const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: _continue,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: BodylineColors.ink,
+                          foregroundColor: BodylineColors.onInk,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: const StadiumBorder(),
+                        ),
+                        child: const Text(
+                          'Continue',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Data stays on this device. Nothing is sent to Vitalog servers.',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ],
                   ),
                 ),
               ),
-              FilledButton(
-                onPressed: _continue,
-                style: FilledButton.styleFrom(
-                  backgroundColor: BodylineColors.ink,
-                  foregroundColor: BodylineColors.onInk,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: const StadiumBorder(),
-                ),
-                child: const Text(
-                  'Continue',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Data stays on this device. Nothing is sent to Vitalog servers.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

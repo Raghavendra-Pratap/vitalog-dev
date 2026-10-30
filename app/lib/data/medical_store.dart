@@ -462,6 +462,24 @@ CREATE TABLE IF NOT EXISTS medication_log (
     );
   }
 
+  /// Attach or detach a medicine from a visit (does not delete the medicine).
+  Future<void> setMedicationVisitId({
+    required String id,
+    String? visitId,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await userDb.update(
+      'medication',
+      {
+        'visit_id': visitId,
+        'updated_at': now,
+        'hlc': '$now-0-local',
+      },
+      where: 'id = ? AND deleted = 0',
+      whereArgs: [id],
+    );
+  }
+
   /// Soft-delete a medicine and its schedules (dose logs kept for history).
   Future<void> softDeleteMedication(String id) async {
     final now = DateTime.now().millisecondsSinceEpoch;

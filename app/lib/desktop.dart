@@ -52,3 +52,12 @@ Future<void> configureDesktopWindow() async {
     await windowManager.focus();
   });
 }
+
+/// Windows can present a blank white window until the surface is resized.
+/// Nudge the size once after the first frame so the UI actually paints.
+Future<void> nudgeWindowsSurface() async {
+  if (kIsWeb || !Platform.isWindows) return;
+  final size = await windowManager.getSize();
+  await windowManager.setSize(Size(size.width + 1, size.height + 1));
+  await windowManager.setSize(size);
+}

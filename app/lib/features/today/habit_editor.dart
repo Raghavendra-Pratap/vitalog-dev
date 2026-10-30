@@ -122,25 +122,37 @@ Future<bool> showHabitEditor({
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'Templates',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: BodylineColors.inkSubtle,
-                      fontWeight: FontWeight.w600,
+                  DropdownButtonFormField<String?>(
+                    value: habitTemplatesFor('lifestyle')
+                            .any((e) => e['key'] == templateKey)
+                        ? templateKey
+                        : null,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Template',
+                      hintText: 'Custom or pick a starter',
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Custom'),
+                      ),
                       for (final t in habitTemplatesFor('lifestyle'))
-                        ActionChip(
-                          label: Text(t['title']!),
-                          onPressed: () => applyTemplate(t),
+                        DropdownMenuItem<String?>(
+                          value: t['key'],
+                          child: Text(t['title']!),
                         ),
                     ],
+                    onChanged: (key) {
+                      if (key == null) {
+                        setLocal(() => templateKey = null);
+                        return;
+                      }
+                      final match = habitTemplatesFor('lifestyle')
+                          .where((e) => e['key'] == key);
+                      if (match.isEmpty) return;
+                      applyTemplate(match.first);
+                    },
                   ),
                   const SizedBox(height: 12),
                   if (profiles.length > 1) ...[
@@ -174,10 +186,29 @@ Future<bool> showHabitEditor({
                   ),
                   const SizedBox(height: 4),
                   SegmentedButton<String>(
+                    showSelectedIcon: false,
+                    style: ButtonStyle(
+                      visualDensity: VisualDensity.compact,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      textStyle: WidgetStatePropertyAll(
+                        Theme.of(ctx).textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
                     segments: const [
-                      ButtonSegment(value: 'yes_no', label: Text('Yes/No')),
-                      ButtonSegment(value: 'count', label: Text('Count')),
-                      ButtonSegment(value: 'duration', label: Text('Duration')),
+                      ButtonSegment(
+                        value: 'yes_no',
+                        label: Text('Yes/No', maxLines: 1, softWrap: false),
+                      ),
+                      ButtonSegment(
+                        value: 'count',
+                        label: Text('Count', maxLines: 1, softWrap: false),
+                      ),
+                      ButtonSegment(
+                        value: 'duration',
+                        label: Text('Duration', maxLines: 1, softWrap: false),
+                      ),
                     ],
                     selected: {kind},
                     onSelectionChanged: (s) => setLocal(() => kind = s.first),
@@ -228,15 +259,16 @@ Future<bool> showHabitEditor({
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 4,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       for (var i = 0; i < 7; i++)
-                        FilterChip(
-                          label: Text(['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]),
+                        _DayCircle(
+                          label: const ['M', 'T', 'W', 'T', 'F', 'S', 'S'][i],
                           selected: days[i] == '1',
-                          onSelected: (v) =>
-                              setLocal(() => days[i] = v ? '1' : '0'),
+                          onTap: () => setLocal(
+                            () => days[i] = days[i] == '1' ? '0' : '1',
+                          ),
                         ),
                     ],
                   ),
@@ -380,4 +412,44 @@ Future<bool> showHabitEditor({
   } catch (_) {}
 
   return true;
+}
+
+class _DayCircle extends StatelessWidget {
+  const _DayCircle({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = selected ? BodylineColors.teal : BodylineColors.chip;
+    final fg = selected ? BodylineColors.onInk : BodylineColors.inkSubtle;
+    return Material(
+      color: bg,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: fg,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

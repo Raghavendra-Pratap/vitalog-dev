@@ -6,6 +6,7 @@ import '../../data/models.dart';
 import '../../desktop.dart';
 import '../../theme/desktop_layout.dart';
 import '../../theme/tokens.dart';
+import '../medicines/dose_wait_header_chip.dart';
 import '../../widgets/clinical_attachments.dart';
 import '../visits/visit_forms.dart';
 
@@ -220,15 +221,14 @@ class DoctorsScreenState extends State<DoctorsScreen> {
       backgroundColor: BodylineColors.paper,
       appBar: widget.embedded
           ? null
-          : AppBar(title: const Text('Doctors')),
+          : AppBar(
+            title: const Text('Doctors'),
+            actions: doseWaitActions(),
+          ),
       floatingActionButton: FloatingActionButton(
         heroTag: widget.embedded ? 'care-tab-doctors-fab' : 'page-doctors-fab',
         onPressed: _addDoctor,
         tooltip: 'Add doctor',
-        backgroundColor: BodylineColors.teal,
-        foregroundColor: BodylineColors.isDark
-            ? const Color(0xFF04201C)
-            : Colors.white,
         child: const Icon(Icons.add),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -508,15 +508,14 @@ class _DoctorDetailPageState extends State<_DoctorDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: BodylineColors.paper,
-      appBar: AppBar(title: Text(widget.doctor.name)),
+      appBar: AppBar(
+        title: Text(widget.doctor.name),
+        actions: doseWaitActions(),
+      ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'doctor-detail-add-visit-fab',
         onPressed: () => _paneKey.currentState?.openAddVisit(),
         tooltip: 'Add visit',
-        backgroundColor: BodylineColors.teal,
-        foregroundColor: BodylineColors.isDark
-            ? const Color(0xFF04201C)
-            : Colors.white,
         child: const Icon(Icons.add),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,

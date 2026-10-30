@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 /// This build, without the +number. Keep this equal to `pubspec.yaml`.
-const vitalogReleaseVersion = '0.2.6';
+const vitalogReleaseVersion = '0.2.8';
 
 const vitalogReleasesUrl =
     'https://api.github.com/repos/Raghavendra-Pratap/vitalog-pub/releases/latest';

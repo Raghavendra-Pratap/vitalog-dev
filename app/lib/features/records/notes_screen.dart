@@ -6,6 +6,7 @@ import '../../data/habits_notes_store.dart';
 import '../../data/local_store.dart';
 import '../../theme/desktop_layout.dart';
 import '../../theme/tokens.dart';
+import '../medicines/dose_wait_header_chip.dart';
 import '../../widgets/chart_link_picker.dart';
 
 enum _NotesFilter { all, none, day, period, linked }
@@ -880,7 +881,10 @@ class NotesScreenState extends State<NotesScreen> {
     if (widget.embedded) return body;
     return Scaffold(
       backgroundColor: BodylineColors.paper,
-      appBar: AppBar(title: const Text('Notes')),
+      appBar: AppBar(
+        title: const Text('Notes'),
+        actions: doseWaitActions(),
+      ),
       floatingActionButton: desktop
           ? null
           : FloatingActionButton(
@@ -1122,8 +1126,6 @@ class _HeaderBar extends StatelessWidget {
         FilledButton.icon(
           onPressed: onNew,
           style: FilledButton.styleFrom(
-            backgroundColor: BodylineColors.ink,
-            foregroundColor: BodylineColors.onInk,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(22),

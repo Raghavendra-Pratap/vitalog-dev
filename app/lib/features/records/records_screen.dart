@@ -7,6 +7,7 @@ import '../../data/local_store.dart';
 import '../../data/models.dart';
 import '../../theme/desktop_layout.dart';
 import '../../theme/tokens.dart';
+import '../medicines/dose_wait_header_chip.dart';
 import '../../widgets/report_title.dart';
 import '../../widgets/clinical_attachments.dart';
 import 'report_detail_screen.dart';
@@ -380,18 +381,9 @@ class _RecordsScreenState extends State<RecordsScreen> {
           if (!widget.asPage)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Records',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  Text(
-                    'Reports, visits and documents',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
+              child: TabPageHeader(
+                title: 'Records',
+                subtitle: 'Reports, visits and documents',
               ),
             ),
           Padding(
@@ -492,8 +484,6 @@ class _RecordsScreenState extends State<RecordsScreen> {
           heroTag: 'page-records-fab',
           onPressed: widget.onAdd,
           tooltip: 'Add report',
-          backgroundColor: BodylineColors.ink,
-          foregroundColor: BodylineColors.onInk,
           child: const Icon(Icons.add),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,

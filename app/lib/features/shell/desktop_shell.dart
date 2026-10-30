@@ -594,7 +594,7 @@ class _DesktopTopBar extends StatelessWidget {
             ),
           ),
           if (onOpenDoseWait != null)
-            DoseWaitHeaderChip(onOpen: onOpenDoseWait!),
+            DoseWaitHeaderChip(onOpen: onOpenDoseWait!, compact: false),
           ..._actions(context),
         ],
       ),
